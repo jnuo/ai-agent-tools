@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-agent-tools"
+version = "0.1.0"
+description = "CLI tools for AI agents to interact with Google and Notion APIs"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "click>=8.1.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+google = [
+    "google-api-python-client>=2.100.0",
+    "google-auth-oauthlib>=1.1.0",
+    "google-auth-httplib2>=0.1.1",
+    "python-dateutil>=2.8.0",
+]
+notion = [
+    "requests>=2.31.0",
+]
+all = [
+    "ai-agent-tools[google,notion]",
+]
+
+[project.scripts]
+aitools = "aitools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
