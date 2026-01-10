@@ -1,0 +1,64 @@
+"""AI Agent Tools - Unified CLI.
+
+CLI for AI agents to interact with Google and Notion APIs.
+"""
+
+import click
+
+from . import __version__
+
+
+@click.group()
+@click.version_option(version=__version__, prog_name="aitools")
+def main():
+    """AI Agent Tools - CLI for Google and Notion APIs.
+
+    Use 'aitools <service> --help' for service-specific commands.
+
+    Examples:
+        aitools google calendar list --days 7 --json
+        aitools notion tasks list DATABASE_ID --json
+    """
+    pass
+
+
+# Lazy-load subcommands to avoid import errors if dependencies aren't installed
+
+
+def _load_google():
+    """Load Google CLI if dependencies are installed."""
+    try:
+        from .google.cli import google
+        return google
+    except ImportError as e:
+        @click.group()
+        def google():
+            """Google operations (not available - install with: pip install ai-agent-tools[google])"""
+            click.echo(f"Google module not available: {e}", err=True)
+            click.echo("Install with: pip install ai-agent-tools[google]", err=True)
+            raise SystemExit(1)
+        return google
+
+
+def _load_notion():
+    """Load Notion CLI if dependencies are installed."""
+    try:
+        from .notion.cli import notion
+        return notion
+    except ImportError as e:
+        @click.group()
+        def notion():
+            """Notion operations (not available - install with: pip install ai-agent-tools[notion])"""
+            click.echo(f"Notion module not available: {e}", err=True)
+            click.echo("Install with: pip install ai-agent-tools[notion]", err=True)
+            raise SystemExit(1)
+        return notion
+
+
+# Register subcommands
+main.add_command(_load_google())
+main.add_command(_load_notion())
+
+
+if __name__ == "__main__":
+    main()
