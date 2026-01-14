@@ -234,19 +234,19 @@ pytest -k "test_create_paragraph"
 
 ### Integration Tests (Local Only)
 
-Integration tests make real API calls and should be run locally before creating PRs:
+Integration tests make real API calls and should be run locally before creating PRs.
+Test resources are created and cleaned up automatically.
 
 ```bash
-# Run Notion integration tests
-export NOTION_API_KEY=secret_xxx
-export NOTION_TEST_DATABASE_ID=xxx   # A test database
-export NOTION_TEST_PAGE_ID=xxx       # A test page
+# Load credentials and run Notion integration tests
+export $(cat credentials/notion/.env | xargs)
 pytest -m integration tests/integration/test_notion_integration.py -v
 
 # Run Google integration tests (requires OAuth setup first)
 pytest -m integration tests/integration/test_google_integration.py -v
 
 # Run ALL tests (unit + integration)
+export $(cat credentials/notion/.env | xargs)
 pytest
 ```
 

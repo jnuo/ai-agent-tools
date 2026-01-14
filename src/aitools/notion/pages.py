@@ -129,6 +129,108 @@ def delete_block(block_id: str) -> bool:
     return True
 
 
+def create_page(parent_id: str, title: str, is_database: bool = False) -> dict:
+    """Create a new page.
+
+    Args:
+        parent_id: Parent page or database ID
+        title: Page title
+        is_database: If True, parent is a database; otherwise it's a page
+
+    Returns:
+        Created page object
+    """
+    if is_database:
+        parent = {"database_id": parent_id}
+        properties = {"title": {"title": [{"text": {"content": title}}]}}
+    else:
+        parent = {"page_id": parent_id}
+        properties = {"title": [{"text": {"content": title}}]}
+
+    return make_request(
+        "POST",
+        "/pages",
+        json={"parent": parent, "properties": properties},
+    )
+
+
+def create_database(parent_page_id: str, title: str, properties: Optional[dict] = None) -> dict:
+    """Create a new database.
+
+    Args:
+        parent_page_id: Parent page ID
+        title: Database title
+        properties: Database property schema (defaults to basic task schema)
+
+    Returns:
+        Created database object
+    """
+    if properties is None:
+        # Default task database schema
+        properties = {
+            "Task": {"title": {}},
+            "Status": {
+                "select": {
+                    "options": [
+                        {"name": "Todo", "color": "gray"},
+                        {"name": "In Progress", "color": "blue"},
+                        {"name": "Done", "color": "green"},
+                    ]
+                }
+            },
+            "Priority Level": {
+                "select": {
+                    "options": [
+                        {"name": "High", "color": "red"},
+                        {"name": "Medium", "color": "yellow"},
+                        {"name": "Low", "color": "gray"},
+                    ]
+                }
+            },
+        }
+
+    return make_request(
+        "POST",
+        "/databases",
+        json={
+            "parent": {"type": "page_id", "page_id": parent_page_id},
+            "title": [{"type": "text", "text": {"content": title}}],
+            "properties": properties,
+        },
+    )
+
+
+def delete_page(page_id: str) -> bool:
+    """Archive (delete) a page.
+
+    Args:
+        page_id: The page ID
+
+    Returns:
+        True if archived successfully
+    """
+    make_request(
+        "PATCH",
+        f"/pages/{page_id}",
+        json={"archived": True},
+    )
+    return True
+
+
+def delete_database(database_id: str) -> bool:
+    """Archive (delete) a database.
+
+    Args:
+        database_id: The database ID
+
+    Returns:
+        True if archived successfully
+    """
+    # Databases are archived via blocks endpoint
+    make_request("DELETE", f"/blocks/{database_id}")
+    return True
+
+
 def search(
     query: str,
     filter_type: Optional[str] = None,
@@ -233,7 +335,7 @@ def create_todo_block(text: str, checked: bool = False) -> dict:
     }
 
 
-def create_toggle_block(text: str, children: list[dict] = None) -> dict:
+def create_toggle_block(text: str, children: Optional[list[dict]] = None) -> dict:
     """Create a toggle block.
 
     Args:

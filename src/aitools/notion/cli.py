@@ -263,7 +263,7 @@ def page_search(query: str, filter_type: str, max_results: int, as_json: bool):
 
 @page.command("append")
 @click.argument("page_id")
-@click.option("--type", "-t", "block_type", type=click.Choice(["paragraph", "heading2", "heading3", "bullet", "todo", "toggle", "divider"]), default="paragraph", help="Block type")
+@click.option("--type", "-t", "block_type", type=click.Choice(["paragraph", "heading1", "heading2", "heading3", "bullet", "numbered", "todo", "toggle", "divider"]), default="paragraph", help="Block type")
 @click.option("--text", "-x", help="Block text content")
 @click.option("--after", "-a", help="Insert after this block ID")
 @click.option("--checked", "-c", is_flag=True, help="For todo: mark as checked")
@@ -277,7 +277,11 @@ def page_append(page_id: str, block_type: str, text: str, after: str, checked: b
     Advanced: aitools notion page append PAGE_ID --json-blocks '[{"type": "paragraph", ...}]'
     """
     if json_blocks:
-        blocks = json.loads(json_blocks)
+        try:
+            blocks = json.loads(json_blocks)
+        except json.JSONDecodeError as e:
+            click.echo(f"Invalid JSON: {e}", err=True)
+            raise SystemExit(1)
     elif block_type == "divider":
         blocks = [notion_pages.create_divider_block()]
     elif not text:
@@ -286,9 +290,11 @@ def page_append(page_id: str, block_type: str, text: str, after: str, checked: b
     else:
         block_creators = {
             "paragraph": lambda: notion_pages.create_paragraph_block(text),
+            "heading1": lambda: notion_pages.create_heading_block(text, level=1),
             "heading2": lambda: notion_pages.create_heading_block(text, level=2),
             "heading3": lambda: notion_pages.create_heading_block(text, level=3),
             "bullet": lambda: notion_pages.create_bulleted_list_item(text),
+            "numbered": lambda: notion_pages.create_numbered_list_item(text),
             "todo": lambda: notion_pages.create_todo_block(text, checked=checked),
             "toggle": lambda: notion_pages.create_toggle_block(text),
         }

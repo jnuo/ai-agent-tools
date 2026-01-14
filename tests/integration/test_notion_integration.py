@@ -2,9 +2,9 @@
 
 These tests make REAL API calls to Notion.
 They require:
-- NOTION_API_KEY environment variable
-- NOTION_TEST_DATABASE_ID environment variable (a task database for testing)
-- NOTION_TEST_PAGE_ID environment variable (a page for testing blocks)
+- NOTION_API_KEY environment variable (or credentials/notion/.env file)
+
+Test resources (database, page) are created automatically and cleaned up after tests.
 
 Run with: pytest -m integration
 Skip with: pytest -m "not integration"
@@ -23,22 +23,79 @@ pytestmark = [
 ]
 
 
-@pytest.fixture
-def test_database_id():
-    """Get test database ID from environment."""
-    db_id = os.environ.get("NOTION_TEST_DATABASE_ID")
-    if not db_id:
-        pytest.skip("NOTION_TEST_DATABASE_ID not set")
-    return db_id
+@pytest.fixture(scope="module")
+def test_resources():
+    """Create test database and page, clean up after all tests.
+
+    This fixture:
+    1. Searches for any accessible page to use as parent
+    2. Creates a test database with task schema
+    3. Creates a test page for block operations
+    4. Yields the IDs to tests
+    5. Cleans up everything after tests complete
+    """
+    from aitools.notion.pages import (
+        search,
+        create_database,
+        create_page,
+        delete_page,
+        delete_database,
+    )
+
+    created_resources = []
+
+    try:
+        # Find a parent page (search for any page we have access to)
+        results = search("", filter_type="page", max_results=1)
+        if not results:
+            pytest.skip("No accessible pages found in Notion workspace")
+
+        parent_page_id = results[0]["id"]
+        print(f"\nUsing parent page: {parent_page_id}")
+
+        # Create test database
+        database = create_database(
+            parent_page_id,
+            "[TEST] Integration Test Database - Safe to Delete"
+        )
+        database_id = database["id"]
+        created_resources.append(("database", database_id))
+        print(f"Created test database: {database_id}")
+
+        # Create test page for block operations
+        page = create_page(
+            parent_page_id,
+            "[TEST] Integration Test Page - Safe to Delete"
+        )
+        page_id = page["id"]
+        created_resources.append(("page", page_id))
+        print(f"Created test page: {page_id}")
+
+        yield {"database_id": database_id, "page_id": page_id}
+
+    finally:
+        # Cleanup: delete all created resources in reverse order
+        for resource_type, resource_id in reversed(created_resources):
+            try:
+                if resource_type == "database":
+                    delete_database(resource_id)
+                else:
+                    delete_page(resource_id)
+                print(f"Cleaned up {resource_type}: {resource_id}")
+            except Exception as e:
+                print(f"Warning: failed to cleanup {resource_type} {resource_id}: {e}")
 
 
 @pytest.fixture
-def test_page_id():
-    """Get test page ID from environment."""
-    page_id = os.environ.get("NOTION_TEST_PAGE_ID")
-    if not page_id:
-        pytest.skip("NOTION_TEST_PAGE_ID not set")
-    return page_id
+def test_database_id(test_resources):
+    """Get test database ID."""
+    return test_resources["database_id"]
+
+
+@pytest.fixture
+def test_page_id(test_resources):
+    """Get test page ID."""
+    return test_resources["page_id"]
 
 
 class TestNotionConnection:
