@@ -231,3 +231,50 @@ def create_todo_block(text: str, checked: bool = False) -> dict:
             "checked": checked,
         }
     }
+
+
+def create_toggle_block(text: str, children: list[dict] = None) -> dict:
+    """Create a toggle block.
+
+    Args:
+        text: Toggle header text
+        children: Optional list of child blocks
+
+    Returns:
+        Block object for appending
+    """
+    block = {
+        "type": "toggle",
+        "toggle": {
+            "rich_text": [{"type": "text", "text": {"content": text}}]
+        }
+    }
+    if children:
+        block["toggle"]["children"] = children
+    return block
+
+
+def create_numbered_list_item(text: str) -> dict:
+    """Create a numbered list item block.
+
+    Args:
+        text: List item text
+
+    Returns:
+        Block object for appending
+    """
+    return {
+        "type": "numbered_list_item",
+        "numbered_list_item": {
+            "rich_text": [{"type": "text", "text": {"content": text}}]
+        }
+    }
+
+
+def create_divider_block() -> dict:
+    """Create a divider block.
+
+    Returns:
+        Block object for appending
+    """
+    return {"type": "divider", "divider": {}}

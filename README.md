@@ -205,6 +205,69 @@ Environment variables:
 - **API keys stay private**: Notion key in env var or local .env file
 - **No auto-send**: Gmail only creates drafts, never sends automatically
 
+## Development
+
+### Setup
+
+```bash
+# Clone and install with dev dependencies
+git clone https://github.com/yourusername/ai-agent-tools.git
+cd ai-agent-tools
+pip install -e ".[all,dev]"
+```
+
+### Running Tests
+
+```bash
+# Run unit tests only (fast, no API calls)
+pytest -m "not integration"
+
+# Run with coverage
+pytest -m "not integration" --cov
+
+# Run specific module tests
+pytest tests/notion/test_auth.py
+
+# Run specific test by name
+pytest -k "test_create_paragraph"
+```
+
+### Integration Tests (Local Only)
+
+Integration tests make real API calls and should be run locally before creating PRs:
+
+```bash
+# Run Notion integration tests
+export NOTION_API_KEY=secret_xxx
+export NOTION_TEST_DATABASE_ID=xxx   # A test database
+export NOTION_TEST_PAGE_ID=xxx       # A test page
+pytest -m integration tests/integration/test_notion_integration.py -v
+
+# Run Google integration tests (requires OAuth setup first)
+pytest -m integration tests/integration/test_google_integration.py -v
+
+# Run ALL tests (unit + integration)
+pytest
+```
+
+### Test Structure
+
+- **Unit tests** (`tests/notion/`, `tests/google/`): Fast, mocked, run automatically in CI
+- **Integration tests** (`tests/integration/`): Real API calls, run locally before PRs
+- **Fixtures**: Shared test data in `tests/conftest.py`
+
+### CI/CD
+
+GitHub Actions runs unit tests automatically on every push and PR. Integration tests are **local-only** - run them manually before creating PRs.
+
+```bash
+# CI runs this automatically
+pytest -m "not integration" --cov
+
+# Run locally before PRs (requires credentials)
+pytest -m integration -v
+```
+
 ## Project Structure
 
 ```
@@ -222,6 +285,12 @@ ai-agent-tools/
 │       ├── tasks.py        # Task database ops
 │       ├── pages.py        # Page/block ops
 │       └── cli.py          # Notion CLI commands
+├── tests/
+│   ├── conftest.py         # Shared fixtures
+│   ├── google/             # Google module tests
+│   └── notion/             # Notion module tests
+├── .github/workflows/
+│   └── test.yml            # CI workflow
 ├── credentials/            # (gitignored)
 │   ├── google/
 │   └── notion/
