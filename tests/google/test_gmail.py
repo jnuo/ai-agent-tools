@@ -178,6 +178,43 @@ class TestCreateDraft:
         assert result["status"] == "draft_created"
         mock_service.users().drafts().create.assert_called()
 
+    @patch("aitools.google.gmail.get_gmail_service")
+    def test_creates_reply_draft_with_threading(self, mock_get_service, sample_gmail_draft):
+        """Should create reply draft with In-Reply-To and References headers."""
+        mock_service = MagicMock()
+        mock_get_service.return_value = mock_service
+
+        # Mock getting the original message for thread info
+        mock_service.users().messages().get().execute.return_value = {
+            "threadId": "thread-abc-123",
+            "payload": {
+                "headers": [
+                    {"name": "Message-ID", "value": "<original-msg-id@mail.gmail.com>"},
+                    {"name": "Subject", "value": "Original Subject"},
+                ]
+            }
+        }
+
+        # Mock draft creation
+        reply_draft = sample_gmail_draft.copy()
+        mock_service.users().drafts().create().execute.return_value = reply_draft
+
+        result = create_draft(
+            to="sender@example.com",
+            subject="Re: Original Subject",
+            body="Thanks for your email!",
+            reply_to_message_id="original-msg-id-12345",
+        )
+
+        assert result["status"] == "draft_created"
+        assert result["thread_id"] == "thread-abc-123"
+        mock_service.users().messages().get.assert_called()
+        mock_service.users().drafts().create.assert_called()
+
+        # Verify the draft body includes threadId
+        create_call = mock_service.users().drafts().create.call_args
+        assert create_call is not None
+
 
 class TestListDrafts:
     """Tests for list_drafts function."""

@@ -208,14 +208,17 @@ def mail_read(message_id: str, as_json: bool):
 @click.option("--to", "-t", required=True, help="Recipient email")
 @click.option("--body", "-b", default="", help="Email body")
 @click.option("--cc", default="", help="CC recipients")
-def mail_draft(subject: str, to: str, body: str, cc: str):
+@click.option("--reply-to", "-r", "reply_to", default="", help="Message ID to reply to (creates threaded reply)")
+def mail_draft(subject: str, to: str, body: str, cc: str, reply_to: str):
     """Create an email draft (does NOT send)."""
-    draft = gmail.create_draft(to=to, subject=subject, body=body, cc=cc)
+    draft = gmail.create_draft(to=to, subject=subject, body=body, cc=cc, reply_to_message_id=reply_to)
 
     click.echo(f"Draft created")
     click.echo(f"   To: {draft['to']}")
     click.echo(f"   Subject: {draft['subject']}")
     click.echo(f"   Draft ID: {draft['id']}")
+    if draft.get("thread_id"):
+        click.echo(f"   Thread ID: {draft['thread_id']} (reply)")
     click.echo("\n   Open Gmail to review and send")
 
 
