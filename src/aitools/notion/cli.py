@@ -261,6 +261,67 @@ def page_search(query: str, filter_type: str, max_results: int, as_json: bool):
         click.echo()
 
 
+@page.command("append")
+@click.argument("page_id")
+@click.option("--type", "-t", "block_type", type=click.Choice(["paragraph", "heading1", "heading2", "heading3", "bullet", "numbered", "todo", "toggle", "divider"]), default="paragraph", help="Block type")
+@click.option("--text", "-x", help="Block text content")
+@click.option("--after", "-a", help="Insert after this block ID")
+@click.option("--checked", "-c", is_flag=True, help="For todo: mark as checked")
+@click.option("--json-blocks", "-j", help="JSON array of blocks to append (advanced)")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def page_append(page_id: str, block_type: str, text: str, after: str, checked: bool, json_blocks: str, as_json: bool):
+    """Append blocks to a page or block.
+
+    Simple usage: aitools notion page append PAGE_ID --type bullet --text "My item"
+
+    Advanced: aitools notion page append PAGE_ID --json-blocks '[{"type": "paragraph", ...}]'
+    """
+    if json_blocks:
+        try:
+            blocks = json.loads(json_blocks)
+        except json.JSONDecodeError as e:
+            click.echo(f"Invalid JSON: {e}", err=True)
+            raise SystemExit(1)
+    elif block_type == "divider":
+        blocks = [notion_pages.create_divider_block()]
+    elif not text:
+        click.echo("Either --text or --json-blocks is required (except for divider)", err=True)
+        raise SystemExit(1)
+    else:
+        block_creators = {
+            "paragraph": lambda: notion_pages.create_paragraph_block(text),
+            "heading1": lambda: notion_pages.create_heading_block(text, level=1),
+            "heading2": lambda: notion_pages.create_heading_block(text, level=2),
+            "heading3": lambda: notion_pages.create_heading_block(text, level=3),
+            "bullet": lambda: notion_pages.create_bulleted_list_item(text),
+            "numbered": lambda: notion_pages.create_numbered_list_item(text),
+            "todo": lambda: notion_pages.create_todo_block(text, checked=checked),
+            "toggle": lambda: notion_pages.create_toggle_block(text),
+        }
+        blocks = [block_creators[block_type]()]
+
+    result = notion_pages.append_blocks(page_id, blocks, after=after)
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+    else:
+        click.echo(f"Appended {len(result)} block(s)")
+        for block in result:
+            click.echo(f"  ID: {block.get('id', 'unknown')}")
+
+
+@page.command("delete")
+@click.argument("block_id")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
+def page_delete(block_id: str, yes: bool):
+    """Delete (archive) a block."""
+    if not yes:
+        click.confirm("Are you sure you want to delete this block?", abort=True)
+
+    notion_pages.delete_block(block_id)
+    click.echo(f"Deleted block {block_id}")
+
+
 def _print_block(block: dict):
     """Print a formatted block."""
     block_type = block.get("type", "unknown")

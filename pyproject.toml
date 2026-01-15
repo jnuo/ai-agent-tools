@@ -37,9 +37,34 @@ notion = [
 all = [
     "ai-agent-tools[google,notion]",
 ]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "responses>=0.25.0",
+]
 
 [project.scripts]
 aitools = "aitools.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "integration: marks tests as integration tests (require real API credentials)",
+]
+
+[tool.coverage.run]
+source = ["src/aitools"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
