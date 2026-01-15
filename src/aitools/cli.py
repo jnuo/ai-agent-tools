@@ -55,9 +55,24 @@ def _load_notion():
         return notion
 
 
+def _load_granola():
+    """Load Granola CLI (reads local Granola cache - no extra deps needed)."""
+    try:
+        from .granola.cli import granola
+        return granola
+    except ImportError as e:
+        @click.group()
+        def granola():
+            """Granola operations (not available)"""
+            click.echo(f"Granola module not available: {e}", err=True)
+            raise SystemExit(1)
+        return granola
+
+
 # Register subcommands
 main.add_command(_load_google())
 main.add_command(_load_notion())
+main.add_command(_load_granola())
 
 
 if __name__ == "__main__":
