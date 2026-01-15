@@ -1,6 +1,6 @@
 # AI Agent Tools
 
-A Python CLI library for AI agents to interact with Google and Notion APIs. Designed to be used with Claude Code, Cursor, and other AI coding assistants.
+A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, and Granola. Designed to be used with Claude Code, Cursor, and other AI coding assistants.
 
 ## Why This Exists
 
@@ -40,6 +40,10 @@ aitools notion tasks list DATABASE_ID --status "Todo" --json
 
 # Notion Pages
 aitools notion page blocks PAGE_ID --json
+
+# Granola Meetings (macOS)
+aitools granola list --json
+aitools granola transcript MEETING_ID --json
 ```
 
 ## Credentials Setup
@@ -111,6 +115,16 @@ aitools notion page get PAGE_ID [--json]
 aitools notion page blocks PAGE_ID [--max 100] [--json]
 aitools notion page search "query" [--type page|database] [--json]
 aitools notion verify  # Test API connection
+```
+
+### Granola Meetings (macOS only)
+
+Reads from Granola's local cache - no API keys needed. See [docs/granola.md](docs/granola.md) for details.
+
+```bash
+aitools granola list [--max 20] [--query "search term"] [--json]
+aitools granola get MEETING_ID [--json]
+aitools granola transcript MEETING_ID [--json] [--raw]
 ```
 
 ## Using with Claude Code
@@ -280,11 +294,14 @@ ai-agent-tools/
 │   │   ├── calendar.py     # Calendar API
 │   │   ├── gmail.py        # Gmail API
 │   │   └── cli.py          # Google CLI commands
-│   └── notion/
-│       ├── auth.py         # API key handling
-│       ├── tasks.py        # Task database ops
-│       ├── pages.py        # Page/block ops
-│       └── cli.py          # Notion CLI commands
+│   ├── notion/
+│   │   ├── auth.py         # API key handling
+│   │   ├── tasks.py        # Task database ops
+│   │   ├── pages.py        # Page/block ops
+│   │   └── cli.py          # Notion CLI commands
+│   └── granola/
+│       ├── meetings.py     # Meeting/transcript reading
+│       └── cli.py          # Granola CLI commands
 ├── tests/
 │   ├── conftest.py         # Shared fixtures
 │   ├── google/             # Google module tests
