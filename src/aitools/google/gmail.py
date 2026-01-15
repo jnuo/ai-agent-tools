@@ -76,6 +76,7 @@ def create_draft(
     body: str,
     cc: str = "",
     bcc: str = "",
+    reply_to_message_id: str = "",
 ) -> dict:
     """Create an email draft (does NOT send).
 
@@ -85,11 +86,32 @@ def create_draft(
         body: Email body (plain text)
         cc: CC recipients (comma-separated)
         bcc: BCC recipients (comma-separated)
+        reply_to_message_id: Message ID to reply to (creates threaded reply)
 
     Returns:
         Draft info dictionary
     """
     service = get_gmail_service()
+
+    thread_id = None
+    original_message_id_header = None
+
+    # If replying, get thread info and Message-ID header from original
+    if reply_to_message_id:
+        original = service.users().messages().get(
+            userId="me",
+            id=reply_to_message_id,
+            format="metadata",
+            metadataHeaders=["Message-ID", "Subject"],
+        ).execute()
+
+        thread_id = original.get("threadId")
+
+        # Get Message-ID header for In-Reply-To and References
+        for header in original.get("payload", {}).get("headers", []):
+            if header["name"] == "Message-ID":
+                original_message_id_header = header["value"]
+                break
 
     # Create message
     message = MIMEText(body)
@@ -101,18 +123,29 @@ def create_draft(
     if bcc:
         message["bcc"] = bcc
 
+    # Add threading headers if replying
+    if original_message_id_header:
+        message["In-Reply-To"] = original_message_id_header
+        message["References"] = original_message_id_header
+
     # Encode
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+
+    # Create draft body
+    draft_body = {"message": {"raw": raw}}
+    if thread_id:
+        draft_body["message"]["threadId"] = thread_id
 
     # Create draft
     draft = service.users().drafts().create(
         userId="me",
-        body={"message": {"raw": raw}},
+        body=draft_body,
     ).execute()
 
     return {
         "id": draft["id"],
         "message_id": draft["message"]["id"],
+        "thread_id": thread_id,
         "status": "draft_created",
         "to": to,
         "subject": subject,
