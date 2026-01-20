@@ -7,6 +7,16 @@ description: Use when user asks about tasks, todo list, calendar events, emails,
 
 This skill uses the `ai-agent-tools` library to manage tasks, calendar, and email.
 
+> **Best Practice: Keep Skills Focused**
+>
+> Avoid putting too many unrelated capabilities into a single skill. Claude Code works better when skills are focused on a specific domain. For example:
+>
+> - **Productivity skill** (this one): Tasks, calendar, email
+> - **Image generation skill**: Separate skill for Gemini image generation
+> - **Meeting notes skill**: Separate skill for Granola
+>
+> This makes it easier for Claude to find the right skill and reduces context size.
+
 ## IMPORTANT: Use This Library, NOT MCPs
 
 **Always use `aitools` CLI commands instead of Notion MCP or other MCPs** for:
@@ -410,3 +420,16 @@ aitools google mail labels --json
 1. Use `aitools notion page search` with user's query
 2. Filter by type if they specify pages or databases
 3. Present results with titles and IDs
+
+---
+
+## Related Skills
+
+The `ai-agent-tools` library supports additional capabilities that are best kept in **separate skills**:
+
+| Skill               | Use Case                                         | Template                         |
+| ------------------- | ------------------------------------------------ | -------------------------------- |
+| **Image Generator** | Generate images, logos, icons with Gemini/Imagen | `gemini-image-skill-template.md` |
+| **Meeting Notes**   | Read Granola meeting transcripts (macOS)         | See `docs/granola.md`            |
+
+Keep skills focused on a single domain for better discoverability and smaller context size.

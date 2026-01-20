@@ -1,6 +1,6 @@
 # AI Agent Tools
 
-A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, and Granola. Designed to be used with Claude Code, Cursor, and other AI coding assistants.
+A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, and Gemini (image generation). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
 
 ## Why This Exists
 
@@ -24,6 +24,7 @@ pip install -e ".[all]"
 # Or install only what you need
 pip install -e ".[google]"  # Google Calendar + Gmail
 pip install -e ".[notion]"  # Notion API
+pip install -e ".[gemini]"  # Gemini AI (image generation)
 ```
 
 ## Quick Start
@@ -44,6 +45,9 @@ aitools notion page blocks PAGE_ID --json
 # Granola Meetings (macOS)
 aitools granola list --json
 aitools granola transcript MEETING_ID --json
+
+# Gemini Image Generation
+aitools gemini generate "A coral orange logo for a SaaS company" -o logo.png
 ```
 
 ## Credentials Setup
@@ -74,6 +78,20 @@ echo "NOTION_API_KEY=secret_xxx" > credentials/notion/.env
 ```
 
 5. Share your Notion pages/databases with the integration
+
+### Gemini (Image Generation)
+
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
+2. Create an API key
+3. Set environment variable or create file:
+
+```bash
+# Option 1: Environment variable
+export GEMINI_API_KEY=your_api_key
+
+# Option 2: Create credentials file
+echo "GEMINI_API_KEY=your_api_key" > credentials/gemini/.env
+```
 
 ## CLI Reference
 
@@ -125,6 +143,27 @@ Reads from Granola's local cache - no API keys needed. See [docs/granola.md](doc
 aitools granola list [--max 20] [--query "search term"] [--json]
 aitools granola get MEETING_ID [--json]
 aitools granola transcript MEETING_ID [--json] [--raw]
+```
+
+### Gemini Image Generation
+
+Generate images from text prompts using Google's Imagen API.
+
+```bash
+aitools gemini generate "prompt text" [-o output.png] [--json]
+```
+
+Examples:
+
+```bash
+# Generate a logo
+aitools gemini generate "A coral orange logo for a SaaS company" -o logo.png
+
+# Generate with default filename (generated_image.png)
+aitools gemini generate "Modern EV charging station"
+
+# Get JSON output
+aitools gemini generate "Abstract art in blue tones" -o art.png --json
 ```
 
 ## Using with Claude Code
@@ -211,6 +250,7 @@ Environment variables:
 | `AITOOLS_CREDENTIALS_DIR` | Override credentials directory   | `./credentials`  |
 | `AITOOLS_TIMEZONE`        | Timezone for calendar operations | `UTC`            |
 | `NOTION_API_KEY`          | Notion API key                   | (from .env file) |
+| `GEMINI_API_KEY`          | Gemini API key for image gen     | (from .env file) |
 
 ## Security Notes
 
@@ -299,9 +339,13 @@ ai-agent-tools/
 │   │   ├── tasks.py        # Task database ops
 │   │   ├── pages.py        # Page/block ops
 │   │   └── cli.py          # Notion CLI commands
-│   └── granola/
-│       ├── meetings.py     # Meeting/transcript reading
-│       └── cli.py          # Granola CLI commands
+│   ├── granola/
+│   │   ├── meetings.py     # Meeting/transcript reading
+│   │   └── cli.py          # Granola CLI commands
+│   └── gemini/
+│       ├── auth.py         # API key handling
+│       ├── image.py        # Image generation
+│       └── cli.py          # Gemini CLI commands
 ├── tests/
 │   ├── conftest.py         # Shared fixtures
 │   ├── google/             # Google module tests
@@ -310,7 +354,8 @@ ai-agent-tools/
 │   └── test.yml            # CI workflow
 ├── credentials/            # (gitignored)
 │   ├── google/
-│   └── notion/
+│   ├── notion/
+│   └── gemini/
 └── examples/
     └── claude-skill-template.md
 ```
