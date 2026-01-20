@@ -69,10 +69,26 @@ def _load_granola():
         return granola
 
 
+def _load_gemini():
+    """Load Gemini CLI if dependencies are installed."""
+    try:
+        from .gemini.cli import gemini
+        return gemini
+    except ImportError as e:
+        @click.group()
+        def gemini():
+            """Gemini operations (not available - install with: pip install ai-agent-tools[gemini])"""
+            click.echo(f"Gemini module not available: {e}", err=True)
+            click.echo("Install with: pip install ai-agent-tools[gemini]", err=True)
+            raise SystemExit(1)
+        return gemini
+
+
 # Register subcommands
 main.add_command(_load_google())
 main.add_command(_load_notion())
 main.add_command(_load_granola())
+main.add_command(_load_gemini())
 
 
 if __name__ == "__main__":

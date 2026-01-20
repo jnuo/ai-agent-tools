@@ -34,8 +34,11 @@ google = [
 notion = [
     "requests>=2.31.0",
 ]
+gemini = [
+    "google-genai>=1.0.0",
+]
 all = [
-    "ai-agent-tools[google,notion]",
+    "ai-agent-tools[google,notion,gemini]",
 ]
 dev = [
     "pytest>=8.0.0",
