@@ -152,14 +152,22 @@ aitools granola transcript MEETING_ID [--json] [--raw]
 Generate images from text prompts using Google's Imagen API.
 
 ```bash
-aitools gemini generate "prompt text" [-o output.png] [--json]
+aitools gemini generate "prompt text" [-o output.png] [-a ASPECT_RATIO] [--json]
 ```
+
+**Aspect ratio options**: `1:1` (square, default), `3:4`, `4:3`, `9:16` (portrait), `16:9` (landscape)
 
 Examples:
 
 ```bash
-# Generate a logo
+# Generate a logo (square)
 aitools gemini generate "A coral orange logo for a SaaS company" -o logo.png
+
+# Generate a wide banner (16:9 landscape)
+aitools gemini generate "Abstract gradient banner" -o banner.png -a 16:9
+
+# Generate a phone wallpaper (9:16 portrait)
+aitools gemini generate "Mountain sunset wallpaper" -o wallpaper.png -a 9:16
 
 # Generate with default filename (generated_image.png)
 aitools gemini generate "Modern EV charging station"
@@ -226,7 +234,7 @@ This keeps read operations fast while protecting against accidental creates/dele
 
 ### Skill Setup
 
-Create a Claude Code skill that contains your personal configuration.
+Create Claude Code skills for different capabilities. **Keep skills focused** - don't put everything in one skill.
 
 ### 1. Install the library
 
@@ -234,7 +242,16 @@ Create a Claude Code skill that contains your personal configuration.
 pip install -e /path/to/ai-agent-tools[all]
 ```
 
-### 2. Create a skill file
+### 2. Create skill files
+
+Use the templates in `examples/`:
+
+| Skill               | Template                         | Use Case                                |
+| ------------------- | -------------------------------- | --------------------------------------- |
+| **Productivity**    | `claude-skill-template.md`       | Tasks, calendar, email                  |
+| **Image Generator** | `gemini-image-skill-template.md` | AI image generation (has cost warnings) |
+
+**Example: Productivity skill**
 
 Create `~/.claude/skills/my-productivity/SKILL.md`:
 
@@ -415,7 +432,8 @@ ai-agent-tools/
 │   ├── notion/
 │   └── gemini/
 └── examples/
-    └── claude-skill-template.md
+    ├── claude-skill-template.md        # Productivity skill (tasks, calendar, email)
+    └── gemini-image-skill-template.md  # Image generation skill
 ```
 
 ## License

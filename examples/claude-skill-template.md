@@ -433,3 +433,5 @@ The `ai-agent-tools` library supports additional capabilities that are best kept
 | **Meeting Notes**   | Read Granola meeting transcripts (macOS)         | See `docs/granola.md`            |
 
 Keep skills focused on a single domain for better discoverability and smaller context size.
+
+> **Note on Image Generator**: This skill has strict cost warnings. It requires gathering full context (aspect ratio, style, colors) and explicit user confirmation before any API call. See the template for details.
