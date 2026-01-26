@@ -2,6 +2,17 @@
 
 This file contains guidelines for Claude Code and contributors working on this repository.
 
+## CRITICAL: Keep Documentation In Sync
+
+**This is a library meant for discovery and use by others.** The README and CLI help must accurately reflect ALL available features. Users should be able to see the full capabilities at a glance.
+
+**Before completing ANY feature addition:**
+
+1. Run `aitools --help` and all subcommand helps to verify CLI documentation
+2. Ensure README.md lists ALL commands with examples
+3. Update the Claude Code permissions section if new commands are added
+4. Verify the Quick Start section shows the new capability
+
 ## When Adding New Features or Integrations
 
 **Documentation Checklist** - When adding a new integration or feature, ensure you update:
@@ -66,6 +77,16 @@ ai-agent-tools/
 │   └── gemini-image-skill-template.md  # Image generation skill
 └── credentials/            # API keys (gitignored)
 ```
+
+## Claude Code Permissions Section
+
+When adding new CLI commands, update the **"Recommended Permissions"** section in README.md:
+
+1. **Read-only commands** (list, get, search, read) → Add to `permissions.allow`
+2. **Safe write commands** (draft, update) → Add to `permissions.allow`
+3. **Destructive commands** (delete, send, create) → Leave OUT of allow list (requires user approval)
+
+This ensures Claude Code users have a smooth experience without constant permission prompts for safe operations.
 
 ## Code Style
 
