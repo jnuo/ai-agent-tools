@@ -131,6 +131,8 @@ aitools notion tasks delete TASK_ID [--yes]
 ```bash
 aitools notion page get PAGE_ID [--json]
 aitools notion page blocks PAGE_ID [--max 100] [--json]
+aitools notion page append PAGE_ID --type paragraph --content "Text to add"
+aitools notion page delete BLOCK_ID [--yes]
 aitools notion page search "query" [--type page|database] [--json]
 aitools notion verify  # Test API connection
 ```
@@ -168,7 +170,63 @@ aitools gemini generate "Abstract art in blue tones" -o art.png --json
 
 ## Using with Claude Code
 
-The best way to use this library is with a Claude Code skill that contains your personal configuration.
+The best way to use this library is with Claude Code. Below are recommended permission settings and skill setup.
+
+### Recommended Permissions
+
+To avoid being prompted for every read operation, add these to your `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(*aitools google mail search*)",
+      "Bash(*aitools google mail read*)",
+      "Bash(*aitools google mail list*)",
+      "Bash(*aitools google mail draft*)",
+      "Bash(*aitools google mail labels*)",
+      "Bash(*aitools google mail drafts*)",
+      "Bash(*aitools google calendar list*)",
+      "Bash(*aitools google calendar get*)",
+      "Bash(*aitools google calendar calendars*)",
+      "Bash(*aitools notion tasks list*)",
+      "Bash(*aitools notion tasks get*)",
+      "Bash(*aitools notion tasks update*)",
+      "Bash(*aitools notion page get*)",
+      "Bash(*aitools notion page blocks*)",
+      "Bash(*aitools notion page append*)",
+      "Bash(*aitools notion page search*)",
+      "Bash(*aitools notion verify*)",
+      "Bash(*aitools granola*)",
+      "Bash(*aitools*--help*)",
+      "Bash(*aitools gemini*)"
+    ]
+  }
+}
+```
+
+**What this allows (no prompts):**
+| Service | Auto-allowed operations |
+|---------|------------------------|
+| Gmail | search, read, list, draft, labels, drafts |
+| Calendar | list, get, calendars |
+| Notion | tasks list/get/update, page get/blocks/append/search |
+| Granola | all (read-only) |
+| Gemini | all (image generation) |
+| Help | all --help commands |
+
+**What still requires approval:**
+| Service | Requires confirmation |
+|---------|----------------------|
+| Gmail | send (if implemented) |
+| Calendar | create, delete |
+| Notion | tasks create/delete, page delete |
+
+This keeps read operations fast while protecting against accidental creates/deletes.
+
+### Skill Setup
+
+Create a Claude Code skill that contains your personal configuration.
 
 ### 1. Install the library
 
