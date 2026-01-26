@@ -19,15 +19,21 @@ def get_client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
+# Supported aspect ratios
+ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"]
+
+
 def generate_image(
     prompt: str,
     output_path: Optional[str] = None,
+    aspect_ratio: Optional[str] = None,
 ) -> dict:
     """Generate an image from a text prompt.
 
     Args:
         prompt: Text description of the image to generate
         output_path: Path to save the image (default: generated_image.png)
+        aspect_ratio: Aspect ratio for the image (1:1, 3:4, 4:3, 9:16, 16:9)
 
     Returns:
         Dict with generation results including file path
@@ -40,13 +46,23 @@ def generate_image(
 
     file_path = Path(output_path)
 
+    # Build config
+    config_kwargs = {"number_of_images": 1}
+    if aspect_ratio:
+        if aspect_ratio not in ASPECT_RATIOS:
+            return {
+                "success": False,
+                "error": f"Invalid aspect ratio. Must be one of: {ASPECT_RATIOS}",
+                "prompt": prompt,
+                "model": DEFAULT_MODEL,
+            }
+        config_kwargs["aspect_ratio"] = aspect_ratio
+
     # Generate image using Imagen API
     response = client.models.generate_images(
         model=DEFAULT_MODEL,
         prompt=prompt,
-        config=types.GenerateImagesConfig(
-            number_of_images=1,
-        ),
+        config=types.GenerateImagesConfig(**config_kwargs),
     )
 
     # Save the generated image
@@ -68,6 +84,7 @@ def generate_image(
             "file": str(file_path),
             "prompt": prompt,
             "model": DEFAULT_MODEL,
+            "aspect_ratio": aspect_ratio or "1:1",
         }
 
     return {

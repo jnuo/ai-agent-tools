@@ -16,18 +16,27 @@ def gemini():
 @gemini.command("generate")
 @click.argument("prompt")
 @click.option("--output", "-o", default="generated_image.png", help="Output file path")
+@click.option(
+    "--aspect-ratio",
+    "-a",
+    type=click.Choice(["1:1", "3:4", "4:3", "9:16", "16:9"]),
+    default=None,
+    help="Aspect ratio (default: 1:1 square)",
+)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def generate(prompt: str, output: str, as_json: bool):
+def generate(prompt: str, output: str, aspect_ratio: str, as_json: bool):
     """Generate an image from a text prompt.
 
     Examples:
         aitools gemini generate "A coral orange logo for a SaaS company"
         aitools gemini generate "Modern EV charging station" -o charging.png
+        aitools gemini generate "Wide landscape banner" -o banner.png -a 16:9
     """
     try:
         result = image.generate_image(
             prompt=prompt,
             output_path=output,
+            aspect_ratio=aspect_ratio,
         )
 
         if as_json:
@@ -37,6 +46,7 @@ def generate(prompt: str, output: str, as_json: bool):
         if result["success"]:
             click.echo(f"\nGenerated: {result['file']}")
             click.echo(f"Model: {result['model']}")
+            click.echo(f"Aspect ratio: {result['aspect_ratio']}")
         else:
             click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
             raise SystemExit(1)
