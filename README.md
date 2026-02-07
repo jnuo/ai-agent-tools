@@ -1,5 +1,7 @@
 # AI Agent Tools
 
+![AI Agent Tools Banner](banner.jpeg)
+
 A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, and Gemini (image generation). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
 
 ## Why This Exists
