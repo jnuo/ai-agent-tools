@@ -1,4 +1,15 @@
-# AI Agent Tools - Development Guidelines
+# AI Agent Tools
+
+Python CLI library providing AI agents access to Google Calendar, Gmail, Notion, Granola, and Gemini.
+
+## On Session Start
+
+1. Use `/notion` skill to check tasks with topic `aitools`
+2. Show pending tasks and ask: "Work on these or something else?"
+
+---
+
+# Development Guidelines
 
 This file contains guidelines for Claude Code and contributors working on this repository.
 

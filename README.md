@@ -134,6 +134,7 @@ aitools notion tasks delete TASK_ID [--yes]
 aitools notion page get PAGE_ID [--json]
 aitools notion page blocks PAGE_ID [--max 100] [--json]
 aitools notion page append PAGE_ID --type paragraph --content "Text to add"
+aitools notion page update PAGE_ID [--title "New Title"] [--property NAME --value VALUE] [--json]
 aitools notion page delete BLOCK_ID [--yes]
 aitools notion page search "query" [--type page|database] [--json]
 aitools notion verify  # Test API connection
@@ -205,6 +206,7 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
       "Bash(*aitools notion page get*)",
       "Bash(*aitools notion page blocks*)",
       "Bash(*aitools notion page append*)",
+      "Bash(*aitools notion page update*)",
       "Bash(*aitools notion page search*)",
       "Bash(*aitools notion verify*)",
       "Bash(*aitools granola*)",
@@ -220,7 +222,7 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
 |---------|------------------------|
 | Gmail | search, read, list, draft, labels, drafts |
 | Calendar | list, get, calendars |
-| Notion | tasks list/get/update, page get/blocks/append/search |
+| Notion | tasks list/get/update, page get/blocks/append/update/search |
 | Granola | all (read-only) |
 | Gemini | all (image generation) |
 | Help | all --help commands |

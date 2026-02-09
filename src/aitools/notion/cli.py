@@ -310,6 +310,69 @@ def page_append(page_id: str, block_type: str, text: str, after: str, checked: b
             click.echo(f"  ID: {block.get('id', 'unknown')}")
 
 
+@page.command("update")
+@click.argument("page_id")
+@click.option("--title", "-t", help="New page title")
+@click.option("--property", "-p", "prop_name", help="Property name to update")
+@click.option("--value", "-v", "prop_value", help="New value for the property")
+@click.option("--prop-type", type=click.Choice(["select", "text", "date", "url", "checkbox", "number"]), default="select", help="Property type (default: select)")
+@click.option("--json-props", "-j", help="JSON object of properties to update (advanced)")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def page_update(page_id: str, title: str, prop_name: str, prop_value: str, prop_type: str, json_props: str, as_json: bool):
+    """Update a page's properties.
+
+    Simple usage:
+        aitools notion page update PAGE_ID --title "New Title"
+        aitools notion page update PAGE_ID --property "Status" --value "Done"
+        aitools notion page update PAGE_ID --property "Priority" --value "High" --prop-type select
+
+    Advanced (JSON):
+        aitools notion page update PAGE_ID --json-props '{"Status": {"select": {"name": "Done"}}}'
+    """
+    properties = None
+
+    if json_props:
+        try:
+            properties = json.loads(json_props)
+        except json.JSONDecodeError as e:
+            click.echo(f"Invalid JSON: {e}", err=True)
+            raise SystemExit(1)
+    elif prop_name and prop_value is not None:
+        # Build property update based on type
+        if prop_type == "select":
+            properties = {prop_name: {"select": {"name": prop_value}}}
+        elif prop_type == "text":
+            properties = {prop_name: {"rich_text": [{"text": {"content": prop_value}}]}}
+        elif prop_type == "date":
+            properties = {prop_name: {"date": {"start": prop_value}}}
+        elif prop_type == "url":
+            properties = {prop_name: {"url": prop_value if prop_value else None}}
+        elif prop_type == "checkbox":
+            properties = {prop_name: {"checkbox": prop_value.lower() in ("true", "1", "yes")}}
+        elif prop_type == "number":
+            try:
+                properties = {prop_name: {"number": float(prop_value)}}
+            except ValueError:
+                click.echo(f"Invalid number: {prop_value}", err=True)
+                raise SystemExit(1)
+
+    if not title and not properties:
+        click.echo("Either --title, --property/--value, or --json-props is required", err=True)
+        raise SystemExit(1)
+
+    result = notion_pages.update_page(page_id, title=title, properties=properties)
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+    else:
+        click.echo(f"Updated page {page_id}")
+        if title:
+            click.echo(f"   Title: {title}")
+        if properties:
+            for prop in properties:
+                click.echo(f"   {prop}: updated")
+
+
 @page.command("delete")
 @click.argument("block_id")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation")

@@ -200,6 +200,45 @@ def create_database(parent_page_id: str, title: str, properties: Optional[dict] 
     )
 
 
+
+
+def update_page(
+    page_id: str,
+    title: Optional[str] = None,
+    properties: Optional[dict] = None,
+) -> dict:
+    """Update a page's properties.
+
+    Args:
+        page_id: The Notion page ID
+        title: New title (updates the title property)
+        properties: Dict of property updates in Notion API format.
+            For select/status properties, use: {"PropertyName": {"select": {"name": "Value"}}}
+            For text properties, use: {"PropertyName": {"rich_text": [{"text": {"content": "Value"}}]}}
+            For date properties, use: {"PropertyName": {"date": {"start": "YYYY-MM-DD"}}}
+
+    Returns:
+        Updated page object
+    """
+    updates = {}
+
+    if title is not None:
+        # Title is a special property - try common title property names
+        updates["title"] = {"title": [{"text": {"content": title}}]}
+
+    if properties:
+        updates.update(properties)
+
+    if not updates:
+        # Nothing to update, return current page
+        return get_page(page_id)
+
+    return make_request(
+        "PATCH",
+        f"/pages/{page_id}",
+        json={"properties": updates},
+    )
+
 def delete_page(page_id: str) -> bool:
     """Archive (delete) a page.
 
