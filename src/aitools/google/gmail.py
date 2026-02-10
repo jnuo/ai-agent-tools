@@ -113,8 +113,11 @@ def create_draft(
                 original_message_id_header = header["value"]
                 break
 
-    # Create message
-    message = MIMEText(body)
+    # Convert plain text to HTML so Gmail handles line wrapping naturally.
+    # Split on double-newlines (paragraph breaks) and wrap each in <p> tags.
+    paragraphs = body.strip().split("\n\n")
+    html_body = "".join(f"<p>{p.replace(chr(10), ' ')}</p>" for p in paragraphs)
+    message = MIMEText(html_body, "html")
     message["to"] = to
     message["subject"] = subject
 
