@@ -230,6 +230,123 @@ def list_labels() -> list[dict]:
     return labels
 
 
+def create_label(name: str) -> dict:
+    """Create a new Gmail label.
+
+    Args:
+        name: Label name
+
+    Returns:
+        Label info dictionary with id and name
+    """
+    service = get_gmail_service()
+
+    label_body = {
+        "name": name,
+        "labelListVisibility": "labelShow",
+        "messageListVisibility": "show",
+    }
+
+    result = service.users().labels().create(
+        userId="me",
+        body=label_body,
+    ).execute()
+
+    return {
+        "id": result["id"],
+        "name": result["name"],
+    }
+
+
+def modify_message(
+    message_id: str,
+    add_labels: list[str] | None = None,
+    remove_labels: list[str] | None = None,
+) -> dict:
+    """Modify labels on a message.
+
+    Args:
+        message_id: The message ID
+        add_labels: Label IDs to add
+        remove_labels: Label IDs to remove
+
+    Returns:
+        Modification result dictionary
+    """
+    service = get_gmail_service()
+
+    body = {
+        "addLabelIds": add_labels or [],
+        "removeLabelIds": remove_labels or [],
+    }
+
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body=body,
+    ).execute()
+
+    return {
+        "message_id": message_id,
+        "labels_added": add_labels or [],
+        "labels_removed": remove_labels or [],
+    }
+
+
+def batch_modify_messages(
+    message_ids: list[str],
+    add_labels: list[str] | None = None,
+    remove_labels: list[str] | None = None,
+) -> dict:
+    """Batch modify labels on multiple messages.
+
+    Args:
+        message_ids: List of message IDs
+        add_labels: Label IDs to add
+        remove_labels: Label IDs to remove
+
+    Returns:
+        Batch modification result dictionary
+    """
+    service = get_gmail_service()
+
+    body = {
+        "ids": message_ids,
+        "addLabelIds": add_labels or [],
+        "removeLabelIds": remove_labels or [],
+    }
+
+    service.users().messages().batchModify(
+        userId="me",
+        body=body,
+    ).execute()
+
+    return {
+        "modified_count": len(message_ids),
+        "labels_added": add_labels or [],
+        "labels_removed": remove_labels or [],
+    }
+
+
+def trash_message(message_id: str) -> bool:
+    """Move a message to trash.
+
+    Args:
+        message_id: The message ID
+
+    Returns:
+        True if trashed successfully
+    """
+    service = get_gmail_service()
+
+    service.users().messages().trash(
+        userId="me",
+        id=message_id,
+    ).execute()
+
+    return True
+
+
 def search_emails(query: str, max_results: int = 10) -> list[dict]:
     """Search emails using Gmail query syntax.
 

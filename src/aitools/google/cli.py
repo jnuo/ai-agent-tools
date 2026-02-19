@@ -281,6 +281,97 @@ def mail_labels(as_json: bool):
         click.echo(f"  - {label['name']} ({label['type']})")
 
 
+@mail.group("label")
+def mail_label():
+    """Label management."""
+    pass
+
+
+@mail_label.command("create")
+@click.argument("name")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def mail_label_create(name: str, as_json: bool):
+    """Create a new Gmail label."""
+    result = gmail.create_label(name)
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    click.echo(f"Label created: {result['name']}")
+    click.echo(f"   ID: {result['id']}")
+
+
+@mail.command("modify")
+@click.argument("message_id")
+@click.option("--add-label", multiple=True, help="Label ID to add")
+@click.option("--remove-label", multiple=True, help="Label ID to remove")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def mail_modify(message_id: str, add_label: tuple, remove_label: tuple, as_json: bool):
+    """Modify labels on a message."""
+    result = gmail.modify_message(
+        message_id=message_id,
+        add_labels=list(add_label) if add_label else None,
+        remove_labels=list(remove_label) if remove_label else None,
+    )
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    click.echo(f"Modified message {result['message_id']}")
+    if result["labels_added"]:
+        click.echo(f"   Added: {', '.join(result['labels_added'])}")
+    if result["labels_removed"]:
+        click.echo(f"   Removed: {', '.join(result['labels_removed'])}")
+
+
+@mail.command("archive")
+@click.argument("message_ids", nargs=-1, required=True)
+def mail_archive(message_ids: tuple):
+    """Archive messages (remove from inbox)."""
+    ids = list(message_ids)
+    result = gmail.batch_modify_messages(
+        message_ids=ids,
+        remove_labels=["INBOX"],
+    )
+
+    click.echo(f"Archived {result['modified_count']} message(s)")
+
+
+@mail.command("trash")
+@click.argument("message_id")
+def mail_trash(message_id: str):
+    """Move a message to trash."""
+    gmail.trash_message(message_id)
+    click.echo(f"Trashed message {message_id}")
+
+
+@mail.command("batch-modify")
+@click.option("--ids", required=True, help="Comma-separated message IDs")
+@click.option("--add-label", multiple=True, help="Label ID to add")
+@click.option("--remove-label", multiple=True, help="Label ID to remove")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def mail_batch_modify(ids: str, add_label: tuple, remove_label: tuple, as_json: bool):
+    """Batch modify labels on multiple messages."""
+    message_ids = [id.strip() for id in ids.split(",")]
+    result = gmail.batch_modify_messages(
+        message_ids=message_ids,
+        add_labels=list(add_label) if add_label else None,
+        remove_labels=list(remove_label) if remove_label else None,
+    )
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    click.echo(f"Modified {result['modified_count']} message(s)")
+    if result["labels_added"]:
+        click.echo(f"   Added: {', '.join(result['labels_added'])}")
+    if result["labels_removed"]:
+        click.echo(f"   Removed: {', '.join(result['labels_removed'])}")
+
+
 def _print_email(email: dict):
     """Print formatted email summary."""
     click.echo(f"  - {email['subject']}")
