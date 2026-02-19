@@ -248,3 +248,15 @@ def sample_gmail_draft():
             "id": "msg-id-67890",
         }
     }
+
+
+@pytest.fixture
+def sample_gmail_label_created():
+    """Sample Gmail label creation response."""
+    return {
+        "id": "Label_123",
+        "name": "Newsletters",
+        "type": "user",
+        "labelListVisibility": "labelShow",
+        "messageListVisibility": "show",
+    }

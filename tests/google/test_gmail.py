@@ -8,13 +8,17 @@ import pytest
 from aitools.google.gmail import (
     _parse_email_full,
     _parse_email_summary,
+    batch_modify_messages,
     create_draft,
+    create_label,
     delete_draft,
     list_drafts,
     list_emails,
     list_labels,
+    modify_message,
     read_email,
     search_emails,
+    trash_message,
 )
 
 
@@ -282,6 +286,103 @@ class TestListLabels:
         assert result[0]["type"] == "system"
         assert result[2]["name"] == "Work"
         assert result[2]["type"] == "user"
+
+
+class TestCreateLabel:
+    """Tests for create_label function."""
+
+    @patch("aitools.google.gmail.get_gmail_service")
+    def test_creates_label(self, mock_get_service, sample_gmail_label_created):
+        """Should create label and return id and name."""
+        mock_service = MagicMock()
+        mock_get_service.return_value = mock_service
+        mock_service.users().labels().create().execute.return_value = sample_gmail_label_created
+
+        result = create_label("Newsletters")
+
+        assert result["id"] == "Label_123"
+        assert result["name"] == "Newsletters"
+        mock_service.users().labels().create.assert_called()
+
+
+class TestModifyMessage:
+    """Tests for modify_message function."""
+
+    @patch("aitools.google.gmail.get_gmail_service")
+    def test_add_labels(self, mock_get_service):
+        """Should add labels to a message."""
+        mock_service = MagicMock()
+        mock_get_service.return_value = mock_service
+        mock_service.users().messages().modify().execute.return_value = {}
+
+        result = modify_message("msg-123", add_labels=["Label_1"])
+
+        assert result["message_id"] == "msg-123"
+        assert result["labels_added"] == ["Label_1"]
+        assert result["labels_removed"] == []
+
+    @patch("aitools.google.gmail.get_gmail_service")
+    def test_remove_labels(self, mock_get_service):
+        """Should remove labels from a message."""
+        mock_service = MagicMock()
+        mock_get_service.return_value = mock_service
+        mock_service.users().messages().modify().execute.return_value = {}
+
+        result = modify_message("msg-123", remove_labels=["INBOX"])
+
+        assert result["message_id"] == "msg-123"
+        assert result["labels_added"] == []
+        assert result["labels_removed"] == ["INBOX"]
+
+    @patch("aitools.google.gmail.get_gmail_service")
+    def test_add_and_remove_labels(self, mock_get_service):
+        """Should add and remove labels simultaneously."""
+        mock_service = MagicMock()
+        mock_get_service.return_value = mock_service
+        mock_service.users().messages().modify().execute.return_value = {}
+
+        result = modify_message("msg-123", add_labels=["Label_1"], remove_labels=["INBOX"])
+
+        assert result["labels_added"] == ["Label_1"]
+        assert result["labels_removed"] == ["INBOX"]
+
+
+class TestBatchModifyMessages:
+    """Tests for batch_modify_messages function."""
+
+    @patch("aitools.google.gmail.get_gmail_service")
+    def test_batch_modify_multiple_ids(self, mock_get_service):
+        """Should batch modify multiple messages."""
+        mock_service = MagicMock()
+        mock_get_service.return_value = mock_service
+        mock_service.users().messages().batchModify().execute.return_value = {}
+
+        result = batch_modify_messages(
+            message_ids=["msg-1", "msg-2", "msg-3"],
+            add_labels=["Label_1"],
+            remove_labels=["INBOX"],
+        )
+
+        assert result["modified_count"] == 3
+        assert result["labels_added"] == ["Label_1"]
+        assert result["labels_removed"] == ["INBOX"]
+        mock_service.users().messages().batchModify.assert_called()
+
+
+class TestTrashMessage:
+    """Tests for trash_message function."""
+
+    @patch("aitools.google.gmail.get_gmail_service")
+    def test_trashes_message(self, mock_get_service):
+        """Should trash message and return True."""
+        mock_service = MagicMock()
+        mock_get_service.return_value = mock_service
+        mock_service.users().messages().trash().execute.return_value = {}
+
+        result = trash_message("msg-123")
+
+        assert result is True
+        mock_service.users().messages().trash.assert_called()
 
 
 class TestSearchEmails:

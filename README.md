@@ -116,6 +116,11 @@ aitools google mail draft SUBJECT --to email@example.com [--body "..."]
 aitools google mail drafts [--json]
 aitools google mail search "from:someone subject:important" [--json]
 aitools google mail labels [--json]
+aitools google mail label create NAME [--json]
+aitools google mail modify MESSAGE_ID [--add-label ID] [--remove-label ID] [--json]
+aitools google mail archive MESSAGE_ID [MESSAGE_ID...]
+aitools google mail trash MESSAGE_ID
+aitools google mail batch-modify --ids "id1,id2,id3" [--add-label ID] [--remove-label ID] [--json]
 ```
 
 ### Notion Tasks
@@ -196,6 +201,10 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
       "Bash(*aitools google mail list*)",
       "Bash(*aitools google mail draft*)",
       "Bash(*aitools google mail labels*)",
+      "Bash(*aitools google mail label create*)",
+      "Bash(*aitools google mail modify*)",
+      "Bash(*aitools google mail archive*)",
+      "Bash(*aitools google mail batch-modify*)",
       "Bash(*aitools google mail drafts*)",
       "Bash(*aitools google calendar list*)",
       "Bash(*aitools google calendar get*)",
@@ -220,7 +229,7 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
 **What this allows (no prompts):**
 | Service | Auto-allowed operations |
 |---------|------------------------|
-| Gmail | search, read, list, draft, labels, drafts |
+| Gmail | search, read, list, draft, labels, drafts, label create, modify, archive, batch-modify |
 | Calendar | list, get, calendars |
 | Notion | tasks list/get/update, page get/blocks/append/update/search |
 | Granola | all (read-only) |
@@ -230,7 +239,7 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
 **What still requires approval:**
 | Service | Requires confirmation |
 |---------|----------------------|
-| Gmail | send (if implemented) |
+| Gmail | send (if implemented), trash |
 | Calendar | create, delete |
 | Notion | tasks create/delete, page delete |
 
