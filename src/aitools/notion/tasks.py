@@ -13,6 +13,7 @@ The database schema is expected to have these properties:
 from typing import Optional
 
 from .auth import make_request
+from . import pages as notion_pages
 
 
 def list_tasks(
@@ -204,6 +205,73 @@ def update_task(
     )
 
     return _parse_task(response)
+
+
+def set_task_content(task_id: str, content: str, replace: bool = False) -> list[dict]:
+    """Set the body content of a task page.
+
+    Parses simple markdown-like text into Notion blocks:
+    - Lines starting with "# " become heading_1
+    - Lines starting with "## " become heading_2
+    - Lines starting with "### " become heading_3
+    - Lines starting with "- " become bulleted list items
+    - Lines starting with "1. " (or any digit) become numbered list items
+    - Lines that are "---" become dividers
+    - Everything else becomes a paragraph
+    - Empty lines become empty paragraphs (spacing)
+
+    Args:
+        task_id: The Notion page ID
+        content: Text content to write (simple markdown)
+        replace: If True, delete existing blocks first
+
+    Returns:
+        List of created block objects
+    """
+    if replace:
+        existing = notion_pages.get_blocks(task_id)
+        for block in existing:
+            try:
+                notion_pages.delete_block(block["id"])
+            except Exception:
+                pass
+
+    blocks = _parse_markdown_to_blocks(content)
+
+    # Notion API allows max 100 blocks per request
+    results = []
+    for i in range(0, len(blocks), 100):
+        chunk = blocks[i:i + 100]
+        results.extend(notion_pages.append_blocks(task_id, chunk))
+
+    return results
+
+
+def _parse_markdown_to_blocks(content: str) -> list[dict]:
+    """Parse simple markdown into Notion block objects."""
+    lines = content.split("\n")
+    blocks = []
+
+    for line in lines:
+        if line.strip() == "---":
+            blocks.append(notion_pages.create_divider_block())
+        elif line.startswith("### "):
+            blocks.append(notion_pages.create_heading_block(line[4:], level=3))
+        elif line.startswith("## "):
+            blocks.append(notion_pages.create_heading_block(line[3:], level=2))
+        elif line.startswith("# "):
+            blocks.append(notion_pages.create_heading_block(line[2:], level=1))
+        elif line.startswith("- "):
+            blocks.append(notion_pages.create_bulleted_list_item(line[2:]))
+        elif len(line) >= 3 and line[0].isdigit() and ". " in line[:4]:
+            text = line[line.index(". ") + 2:]
+            blocks.append(notion_pages.create_numbered_list_item(text))
+        elif line.strip() == "":
+            blocks.append(notion_pages.create_paragraph_block(""))
+        else:
+            blocks.append(notion_pages.create_paragraph_block(line))
+
+    return blocks
 
 
 def delete_task(task_id: str) -> bool:

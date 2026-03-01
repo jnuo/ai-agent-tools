@@ -90,3 +90,41 @@ def get_notion_api_key() -> Optional[str]:
                         return line.split("=", 1)[1].strip().strip('"\'')
 
     return None
+
+
+def get_resend_credentials_dir() -> Path:
+    """Get Resend credentials directory."""
+    return get_credentials_dir("resend")
+
+
+def get_resend_api_key() -> Optional[str]:
+    """Get Resend API key.
+
+    Priority:
+    1. RESEND_API_KEY environment variable
+    2. .env file in resend credentials directory
+
+    Returns:
+        API key string or None if not found
+    """
+    # Check environment variable first
+    api_key = os.environ.get("RESEND_API_KEY")
+    if api_key:
+        return api_key
+
+    # Try loading from .env file
+    env_file = get_resend_credentials_dir() / ".env"
+    if env_file.exists():
+        try:
+            from dotenv import dotenv_values
+            values = dotenv_values(env_file)
+            return values.get("RESEND_API_KEY")
+        except ImportError:
+            # dotenv not installed, try manual parsing
+            with open(env_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("RESEND_API_KEY="):
+                        return line.split("=", 1)[1].strip().strip('"\'')
+
+    return None

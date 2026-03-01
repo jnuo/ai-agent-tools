@@ -84,11 +84,27 @@ def _load_gemini():
         return gemini
 
 
+def _load_resend():
+    """Load Resend CLI if dependencies are installed."""
+    try:
+        from .resend.cli import resend
+        return resend
+    except ImportError as e:
+        @click.group()
+        def resend():
+            """Resend operations (not available - install with: pip install ai-agent-tools[resend])"""
+            click.echo(f"Resend module not available: {e}", err=True)
+            click.echo("Install with: pip install ai-agent-tools[resend]", err=True)
+            raise SystemExit(1)
+        return resend
+
+
 # Register subcommands
 main.add_command(_load_google())
 main.add_command(_load_notion())
 main.add_command(_load_granola())
 main.add_command(_load_gemini())
+main.add_command(_load_resend())
 
 
 if __name__ == "__main__":
