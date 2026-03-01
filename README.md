@@ -2,7 +2,7 @@
 
 ![AI Agent Tools Banner](banner.jpeg)
 
-A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, and Gemini (image generation). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
+A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, Gemini (image generation), and Resend (email). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
 
 ## Why This Exists
 
@@ -27,6 +27,7 @@ pip install -e ".[all]"
 pip install -e ".[google]"  # Google Calendar + Gmail
 pip install -e ".[notion]"  # Notion API
 pip install -e ".[gemini]"  # Gemini AI (image generation)
+pip install -e ".[resend]"  # Resend (email inbox + send)
 ```
 
 ## Quick Start
@@ -50,6 +51,11 @@ aitools granola transcript MEETING_ID --json
 
 # Gemini Image Generation
 aitools gemini generate "A coral orange logo for a SaaS company" -o logo.png
+
+# Resend Email
+aitools resend inbox --json
+aitools resend read EMAIL_ID --json
+aitools resend send --from "noreply@example.com" --to "user@example.com" --subject "Hi" --body "Hello"
 ```
 
 ## Credentials Setup
@@ -93,6 +99,20 @@ export GEMINI_API_KEY=your_api_key
 
 # Option 2: Create credentials file
 echo "GEMINI_API_KEY=your_api_key" > credentials/gemini/.env
+```
+
+### Resend
+
+1. Go to [Resend API Keys](https://resend.com/api-keys)
+2. Create a full-access API key
+3. Set environment variable or create file:
+
+```bash
+# Option 1: Environment variable
+export RESEND_API_KEY=re_xxx
+
+# Option 2: Create credentials file
+echo "RESEND_API_KEY=re_xxx" > credentials/resend/.env
 ```
 
 ## CLI Reference
@@ -184,6 +204,14 @@ aitools gemini generate "Modern EV charging station"
 aitools gemini generate "Abstract art in blue tones" -o art.png --json
 ```
 
+### Resend Email
+
+```bash
+aitools resend inbox [--limit 20] [--json]
+aitools resend read EMAIL_ID [--json]
+aitools resend send --from "noreply@example.com" --to "user@example.com" --subject "Subject" --body "Body"
+```
+
 ## Using with Claude Code
 
 The best way to use this library is with Claude Code. Below are recommended permission settings and skill setup.
@@ -220,7 +248,9 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
       "Bash(*aitools notion verify*)",
       "Bash(*aitools granola*)",
       "Bash(*aitools*--help*)",
-      "Bash(*aitools gemini*)"
+      "Bash(*aitools gemini*)",
+      "Bash(*aitools resend inbox*)",
+      "Bash(*aitools resend read*)"
     ]
   }
 }
@@ -234,6 +264,7 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
 | Notion | tasks list/get/update, page get/blocks/append/update/search |
 | Granola | all (read-only) |
 | Gemini | all (image generation) |
+| Resend | inbox, read |
 | Help | all --help commands |
 
 **What still requires approval:**
@@ -242,6 +273,7 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
 | Gmail | send (if implemented), trash |
 | Calendar | create, delete |
 | Notion | tasks create/delete, page delete |
+| Resend | send |
 
 This keeps read operations fast while protecting against accidental creates/deletes.
 
@@ -339,6 +371,7 @@ Environment variables:
 | `AITOOLS_TIMEZONE`        | Timezone for calendar operations | `UTC`            |
 | `NOTION_API_KEY`          | Notion API key                   | (from .env file) |
 | `GEMINI_API_KEY`          | Gemini API key for image gen     | (from .env file) |
+| `RESEND_API_KEY`          | Resend API key for email         | (from .env file) |
 
 ## Security Notes
 
@@ -430,10 +463,14 @@ ai-agent-tools/
 │   ├── granola/
 │   │   ├── meetings.py     # Meeting/transcript reading
 │   │   └── cli.py          # Granola CLI commands
-│   └── gemini/
+│   ├── gemini/
+│   │   ├── auth.py         # API key handling
+│   │   ├── image.py        # Image generation
+│   │   └── cli.py          # Gemini CLI commands
+│   └── resend/
 │       ├── auth.py         # API key handling
-│       ├── image.py        # Image generation
-│       └── cli.py          # Gemini CLI commands
+│       ├── mail.py         # Inbox + send operations
+│       └── cli.py          # Resend CLI commands
 ├── tests/
 │   ├── conftest.py         # Shared fixtures
 │   ├── google/             # Google module tests
@@ -443,7 +480,8 @@ ai-agent-tools/
 ├── credentials/            # (gitignored)
 │   ├── google/
 │   ├── notion/
-│   └── gemini/
+│   ├── gemini/
+│   └── resend/
 └── examples/
     ├── claude-skill-template.md        # Productivity skill (tasks, calendar, email)
     └── gemini-image-skill-template.md  # Image generation skill

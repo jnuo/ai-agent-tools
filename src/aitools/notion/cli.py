@@ -106,24 +106,51 @@ def tasks_create(database_id: str, title: str, status: str, priority: str, topic
 @click.option("--topic", "-t", help="New topic")
 @click.option("--due", "-d", help="New due date (YYYY-MM-DD)")
 @click.option("--url", "-u", help="New URL")
+@click.option("--content", "-c", help="Page body content (simple markdown). Use --replace-content to overwrite existing.")
+@click.option("--content-file", "-f", type=click.Path(exists=True), help="Read page body content from a file")
+@click.option("--replace-content", is_flag=True, help="Replace existing page content instead of appending")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def tasks_update(task_id: str, title: str, status: str, priority: str, topic: str, due: str, url: str, as_json: bool):
-    """Update an existing task."""
-    task = notion_tasks.update_task(
-        task_id=task_id,
-        title=title,
-        status=status,
-        priority=priority,
-        topic=topic,
-        due_date=due,
-        url=url,
-    )
+def tasks_update(task_id: str, title: str, status: str, priority: str, topic: str, due: str, url: str, content: str, content_file: str, replace_content: bool, as_json: bool):
+    """Update an existing task.
+
+    Supports writing content into the page body:
+
+        aitools notion tasks update TASK_ID --content "## Notes\\n- Item 1\\n- Item 2"
+        aitools notion tasks update TASK_ID --content-file notes.md --replace-content
+    """
+    # Update properties if any provided
+    has_props = any(v is not None for v in [title, status, priority, topic, due, url])
+    if has_props:
+        task = notion_tasks.update_task(
+            task_id=task_id,
+            title=title,
+            status=status,
+            priority=priority,
+            topic=topic,
+            due_date=due,
+            url=url,
+        )
+    else:
+        task = notion_tasks.get_task(task_id)
+
+    # Handle content
+    body_content = content
+    if content_file:
+        with open(content_file) as f:
+            body_content = f.read()
+
+    blocks_created = 0
+    if body_content:
+        result = notion_tasks.set_task_content(task_id, body_content, replace=replace_content)
+        blocks_created = len(result)
 
     if as_json:
         click.echo(json.dumps(task, indent=2))
     else:
         click.echo(f"Updated task: {task['title']}")
         click.echo(f"   Status: {task['status']}")
+        if blocks_created:
+            click.echo(f"   Content: {blocks_created} block(s) written")
 
 
 @tasks.command("delete")
