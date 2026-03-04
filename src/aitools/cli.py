@@ -99,12 +99,28 @@ def _load_resend():
         return resend
 
 
+def _load_analytics():
+    """Load Analytics CLI if dependencies are installed."""
+    try:
+        from .analytics.cli import analytics
+        return analytics
+    except ImportError as e:
+        @click.group()
+        def analytics():
+            """Analytics operations (not available - install with: pip install ai-agent-tools[analytics])"""
+            click.echo(f"Analytics module not available: {e}", err=True)
+            click.echo("Install with: pip install ai-agent-tools[analytics]", err=True)
+            raise SystemExit(1)
+        return analytics
+
+
 # Register subcommands
 main.add_command(_load_google())
 main.add_command(_load_notion())
 main.add_command(_load_granola())
 main.add_command(_load_gemini())
 main.add_command(_load_resend())
+main.add_command(_load_analytics())
 
 
 if __name__ == "__main__":
