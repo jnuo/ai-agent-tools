@@ -129,6 +129,7 @@ def _load_seo():
         return seo
 
 
+
 # Register subcommands
 main.add_command(_load_google())
 main.add_command(_load_notion())
