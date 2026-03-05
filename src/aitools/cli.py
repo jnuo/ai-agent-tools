@@ -114,6 +114,22 @@ def _load_analytics():
         return analytics
 
 
+def _load_seo():
+    """Load SEO CLI if dependencies are installed."""
+    try:
+        from .seo.cli import seo
+        return seo
+    except ImportError as e:
+        @click.group()
+        def seo():
+            """SEO operations (not available - install with: pip install ai-agent-tools[seo])"""
+            click.echo(f"SEO module not available: {e}", err=True)
+            click.echo("Install with: pip install ai-agent-tools[seo]", err=True)
+            raise SystemExit(1)
+        return seo
+
+
+
 # Register subcommands
 main.add_command(_load_google())
 main.add_command(_load_notion())
@@ -121,6 +137,7 @@ main.add_command(_load_granola())
 main.add_command(_load_gemini())
 main.add_command(_load_resend())
 main.add_command(_load_analytics())
+main.add_command(_load_seo())
 
 
 if __name__ == "__main__":
