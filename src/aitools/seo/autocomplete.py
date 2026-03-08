@@ -1,5 +1,7 @@
 """Google Autocomplete suggestions."""
 
+import json
+
 import httpx
 
 
@@ -36,7 +38,13 @@ def get_autocomplete(
             f"Google Autocomplete error ({response.status_code}): {response.text}"
         )
 
-    data = response.json()
+    # Google's autocomplete API returns ISO-8859-1 for some locales (e.g. DE),
+    # but doesn't always declare it in Content-Type. Try UTF-8 first, fall back.
+    try:
+        text = response.content.decode("utf-8")
+    except UnicodeDecodeError:
+        text = response.content.decode("latin-1")
+    data = json.loads(text)
 
     # Response format: ["query", ["suggestion1", "suggestion2", ...]]
     return data[1] if len(data) > 1 else []
