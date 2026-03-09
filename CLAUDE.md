@@ -79,7 +79,7 @@ ai-agent-tools/
 │   ├── gemini/             # Image generation
 │   ├── resend/             # Email inbox + send
 │   ├── analytics/          # GA4 reports, GitHub stats
-│   └── seo/                # Lighthouse, PageSpeed, Autocomplete, Serper
+│   └── seo/                # Lighthouse, PageSpeed, Autocomplete, Serper, DataForSEO
 ├── tests/
 │   ├── google/
 │   ├── notion/

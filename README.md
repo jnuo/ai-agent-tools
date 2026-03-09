@@ -2,7 +2,7 @@
 
 ![AI Agent Tools Banner](banner.jpeg)
 
-A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, Gemini (image generation), Resend (email), Google Analytics 4, GitHub analytics, and SEO tools (Lighthouse, PageSpeed, Google Autocomplete, Serper SERP). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
+A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, Gemini (image generation), Resend (email), Google Analytics 4, GitHub analytics, and SEO tools (Lighthouse, PageSpeed, Google Autocomplete, Serper SERP, DataForSEO keyword volume). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
 
 ## Why This Exists
 
@@ -29,7 +29,7 @@ pip install -e ".[notion]"     # Notion API
 pip install -e ".[gemini]"     # Gemini AI (image generation)
 pip install -e ".[resend]"     # Resend (email inbox + send)
 pip install -e ".[analytics]"  # Google Analytics 4 + GitHub stats
-pip install -e ".[seo]"        # Lighthouse, PageSpeed, Autocomplete, Serper
+pip install -e ".[seo]"        # Lighthouse, PageSpeed, Autocomplete, Serper, DataForSEO
 ```
 
 ## Quick Start
@@ -77,6 +77,10 @@ aitools seo autocomplete "blood test tracking" --json
 
 # SEO — Serper SERP Analysis
 aitools seo serper "kan tahlili takip" --country tr --lang tr --json
+
+# SEO — DataForSEO Keyword Volume
+aitools seo volume "buy laptop" "cheap laptops" --json
+aitools seo volume "laptop kaufen" -c de -l de --json
 ```
 
 ## Credentials Setup
@@ -199,6 +203,23 @@ echo "your_key" > ~/.config/aitools/serper_api_key
 ### SEO — Google Autocomplete
 
 Free, no API key needed. Uses Google's public autocomplete endpoint.
+
+### SEO — DataForSEO (Keyword Volume)
+
+1. Go to [DataForSEO](https://app.dataforseo.com/api-access)
+2. Get your login email and API password
+3. Set up:
+
+```bash
+# Option 1: Environment variables
+export DATAFORSEO_LOGIN='your-login'
+export DATAFORSEO_PASSWORD='your-password'
+
+# Option 2: Credentials file
+mkdir -p credentials/seo
+echo 'DATAFORSEO_LOGIN=your-login' > credentials/seo/.env
+echo 'DATAFORSEO_PASSWORD=your-password' >> credentials/seo/.env
+```
 
 ## CLI Reference
 
@@ -382,6 +403,29 @@ aitools seo serper "kan tahlili takip" --country tr --lang tr --json
 aitools seo serper "health tracking app" --type news --json
 ```
 
+### SEO — DataForSEO (Keyword Volume)
+
+Get search volume, CPC, and competition data for keywords using DataForSEO's Google Ads API.
+
+```bash
+# Get volume for multiple keywords
+aitools seo volume "buy laptop" "cheap laptops" --json
+
+# Localized volume (Germany, German)
+aitools seo volume "laptop kaufen" -c de -l de --json
+
+# Include SERP features info
+aitools seo volume "blood test app" -s --json
+
+# List supported countries
+aitools seo countries
+
+# List supported languages
+aitools seo languages
+```
+
+Output includes search volume, CPC, competition level, competition index, and monthly search trends.
+
 ## Using with Claude Code
 
 The best way to use this library is with Claude Code. Below are recommended permission settings and skill setup.
@@ -439,7 +483,7 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
 | Gemini    | all (image generation)                                                                 |
 | Resend    | inbox, read                                                                            |
 | Analytics | all GA4 reports, all GitHub stats (read-only)                                          |
-| SEO       | all (lighthouse, pagespeed, autocomplete, serper — all read-only)                      |
+| SEO       | all (lighthouse, pagespeed, autocomplete, serper, dataforseo volume — all read-only)   |
 | Help      | all --help commands                                                                    |
 
 **What still requires approval:**
@@ -552,6 +596,8 @@ Environment variables:
 | `GA4_SERVICE_ACCOUNT_FILE` | Path to GA4 service account JSON file | --                 |
 | `PAGESPEED_API_KEY`        | Google PageSpeed API key (optional)   | --                 |
 | `SERPER_API_KEY`           | Serper.dev API key                    | (from config file) |
+| `DATAFORSEO_LOGIN`         | DataForSEO login email                | (from .env file)   |
+| `DATAFORSEO_PASSWORD`      | DataForSEO API password               | (from .env file)   |
 
 ## Security Notes
 
@@ -657,6 +703,8 @@ ai-agent-tools/
 │   │   ├── github.py       # GitHub traffic, stars, referrers
 │   │   └── cli.py          # Analytics CLI commands
 │   └── seo/
+│       ├── auth.py         # DataForSEO credentials
+│       ├── volume.py       # DataForSEO keyword volume
 │       ├── lighthouse.py   # Local Lighthouse audit runner
 │       ├── pagespeed.py    # PageSpeed Insights API v5
 │       ├── autocomplete.py # Google Autocomplete suggestions
@@ -677,7 +725,8 @@ ai-agent-tools/
 │   ├── google/
 │   ├── notion/
 │   ├── gemini/
-│   └── resend/
+│   ├── resend/
+│   └── seo/
 └── examples/
     ├── claude-skill-template.md        # Productivity skill (tasks, calendar, email)
     └── gemini-image-skill-template.md  # Image generation skill
