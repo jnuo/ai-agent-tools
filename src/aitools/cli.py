@@ -84,16 +84,47 @@ def _load_gemini():
         return gemini
 
 
+def _load_resend():
+    """Load Resend CLI if dependencies are installed."""
+    try:
+        from .resend.cli import resend
+        return resend
+    except ImportError as e:
+        @click.group()
+        def resend():
+            """Resend operations (not available - install with: pip install ai-agent-tools[resend])"""
+            click.echo(f"Resend module not available: {e}", err=True)
+            click.echo("Install with: pip install ai-agent-tools[resend]", err=True)
+            raise SystemExit(1)
+        return resend
+
+
+def _load_analytics():
+    """Load Analytics CLI if dependencies are installed."""
+    try:
+        from .analytics.cli import analytics
+        return analytics
+    except ImportError as e:
+        @click.group()
+        def analytics():
+            """Analytics operations (not available - install with: pip install ai-agent-tools[analytics])"""
+            click.echo(f"Analytics module not available: {e}", err=True)
+            click.echo("Install with: pip install ai-agent-tools[analytics]", err=True)
+            raise SystemExit(1)
+        return analytics
+
+
 def _load_seo():
-    """Load SEO CLI (DataForSEO integration)."""
+    """Load SEO CLI (Lighthouse, PageSpeed, keyword volume, SERP)."""
     try:
         from .seo.cli import seo
         return seo
     except ImportError as e:
         @click.group()
         def seo():
-            """SEO operations (not available)"""
+            """SEO operations (not available - install with: pip install ai-agent-tools[seo])"""
             click.echo(f"SEO module not available: {e}", err=True)
+            click.echo("Install with: pip install ai-agent-tools[seo]", err=True)
             raise SystemExit(1)
         return seo
 
@@ -103,6 +134,8 @@ main.add_command(_load_google())
 main.add_command(_load_notion())
 main.add_command(_load_granola())
 main.add_command(_load_gemini())
+main.add_command(_load_resend())
+main.add_command(_load_analytics())
 main.add_command(_load_seo())
 
 

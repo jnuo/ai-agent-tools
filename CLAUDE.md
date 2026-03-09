@@ -76,7 +76,10 @@ ai-agent-tools/
 │   ├── google/             # Gmail & Calendar
 │   ├── notion/             # Tasks & Pages
 │   ├── granola/            # Meeting notes (macOS)
-│   └── gemini/             # Image generation
+│   ├── gemini/             # Image generation
+│   ├── resend/             # Email inbox + send
+│   ├── analytics/          # GA4 reports, GitHub stats
+│   └── seo/                # Lighthouse, PageSpeed, Autocomplete, Serper
 ├── tests/
 │   ├── google/
 │   ├── notion/

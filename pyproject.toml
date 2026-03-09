@@ -37,8 +37,18 @@ notion = [
 gemini = [
     "google-genai>=1.0.0",
 ]
+resend = [
+    "requests>=2.31.0",
+]
+analytics = [
+    "google-analytics-data>=0.18.0",
+    "google-auth-oauthlib>=1.1.0",
+]
+seo = [
+    "httpx>=0.27.0",
+]
 all = [
-    "ai-agent-tools[google,notion,gemini]",
+    "ai-agent-tools[google,notion,gemini,resend,analytics,seo]",
 ]
 dev = [
     "pytest>=8.0.0",

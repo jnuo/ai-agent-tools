@@ -2,7 +2,7 @@
 
 ![AI Agent Tools Banner](banner.jpeg)
 
-A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, and Gemini (image generation). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
+A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, Gemini (image generation), Resend (email), Google Analytics 4, GitHub analytics, and SEO tools (Lighthouse, PageSpeed, Google Autocomplete, Serper SERP). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
 
 ## Why This Exists
 
@@ -17,16 +17,19 @@ MCPs (Model Context Protocol servers) are often limited by their schemas and don
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ai-agent-tools.git
+git clone https://github.com/jnuo/ai-agent-tools.git
 cd ai-agent-tools
 
 # Install with all dependencies
 pip install -e ".[all]"
 
 # Or install only what you need
-pip install -e ".[google]"  # Google Calendar + Gmail
-pip install -e ".[notion]"  # Notion API
-pip install -e ".[gemini]"  # Gemini AI (image generation)
+pip install -e ".[google]"     # Google Calendar + Gmail
+pip install -e ".[notion]"     # Notion API
+pip install -e ".[gemini]"     # Gemini AI (image generation)
+pip install -e ".[resend]"     # Resend (email inbox + send)
+pip install -e ".[analytics]"  # Google Analytics 4 + GitHub stats
+pip install -e ".[seo]"        # Lighthouse, PageSpeed, Autocomplete, Serper
 ```
 
 ## Quick Start
@@ -50,6 +53,30 @@ aitools granola transcript MEETING_ID --json
 
 # Gemini Image Generation
 aitools gemini generate "A coral orange logo for a SaaS company" -o logo.png
+
+# Resend Email
+aitools resend inbox --json
+aitools resend read EMAIL_ID --json
+aitools resend send --from "noreply@example.com" --to "user@example.com" --subject "Hi" --body "Hello"
+
+# Google Analytics 4
+aitools analytics ga4 report PROPERTY_ID -d date -m sessions,activeUsers --start 7daysAgo --json
+
+# GitHub Analytics
+aitools analytics github stats owner/repo --json
+aitools analytics github traffic owner/repo --json
+
+# SEO — Lighthouse Audit
+aitools seo lighthouse https://example.com --json
+
+# SEO — PageSpeed Insights (no API key required, optional for higher rate limits)
+aitools seo pagespeed https://example.com --strategy desktop --json
+
+# SEO — Google Autocomplete (free, no API key)
+aitools seo autocomplete "blood test tracking" --json
+
+# SEO — Serper SERP Analysis
+aitools seo serper "kan tahlili takip" --country tr --lang tr --json
 ```
 
 ## Credentials Setup
@@ -63,6 +90,26 @@ aitools gemini generate "A coral orange logo for a SaaS company" -o logo.png
 5. Download JSON and save as `credentials/google/client_secret.json`
 
 First run will open browser for OAuth login. Token is cached in `credentials/google/token.json`.
+
+### Google Analytics 4
+
+Uses the same Google Cloud project but requires a separate OAuth scope. Three authentication methods:
+
+1. **OAuth (interactive)** -- uses the same `credentials/google/client_secret.json`, stores a separate `token_analytics.json`
+2. **Service account JSON string** (CI/automated):
+   ```bash
+   export GA4_SERVICE_ACCOUNT_JSON='{"type": "service_account", ...}'
+   ```
+3. **Service account file** (CI/automated):
+   ```bash
+   export GA4_SERVICE_ACCOUNT_FILE=/path/to/service-account.json
+   ```
+
+**Setup:**
+
+1. In [Google Cloud Console](https://console.cloud.google.com), enable the **Google Analytics Data API**
+2. Grant the service account (or your OAuth user) **Viewer** access in GA4 Admin > Property Access
+3. Create a free Google Cloud account -- the GA4 Data API includes **25,000 requests/day free** (no billing required)
 
 ### Notion
 
@@ -94,6 +141,64 @@ export GEMINI_API_KEY=your_api_key
 # Option 2: Create credentials file
 echo "GEMINI_API_KEY=your_api_key" > credentials/gemini/.env
 ```
+
+### Resend
+
+1. Go to [Resend API Keys](https://resend.com/api-keys)
+2. Create a full-access API key
+3. Set environment variable or create file:
+
+```bash
+# Option 1: Environment variable
+export RESEND_API_KEY=re_xxx
+
+# Option 2: Create credentials file
+echo "RESEND_API_KEY=re_xxx" > credentials/resend/.env
+```
+
+### SEO — PageSpeed Insights
+
+PageSpeed Insights works **without an API key** but has low rate limits. For higher rate limits:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Enable the **PageSpeed Insights API** (APIs & Services > Library)
+3. Create an API key (APIs & Services > Credentials)
+4. Free tier: **25,000 queries/day** at no cost
+
+```bash
+# Option 1: Pass via CLI
+aitools seo pagespeed https://example.com --api-key YOUR_KEY
+
+# Option 2: Environment variable
+export PAGESPEED_API_KEY=your_key
+```
+
+### SEO — Lighthouse
+
+Requires the Lighthouse CLI installed locally:
+
+```bash
+npm install -g lighthouse
+```
+
+### SEO — Serper (SERP Analysis)
+
+1. Go to [Serper.dev](https://serper.dev/api-key)
+2. Create an API key (2,500 free queries included)
+3. Set up:
+
+```bash
+# Option 1: Environment variable
+export SERPER_API_KEY=your_key
+
+# Option 2: Config file
+mkdir -p ~/.config/aitools
+echo "your_key" > ~/.config/aitools/serper_api_key
+```
+
+### SEO — Google Autocomplete
+
+Free, no API key needed. Uses Google's public autocomplete endpoint.
 
 ## CLI Reference
 
@@ -147,7 +252,7 @@ aitools notion verify  # Test API connection
 
 ### Granola Meetings (macOS only)
 
-Reads from Granola's local cache - no API keys needed. See [docs/granola.md](docs/granola.md) for details.
+Reads from Granola's local cache -- no API keys needed. See [docs/granola.md](docs/granola.md) for details.
 
 ```bash
 aitools granola list [--max 20] [--query "search term"] [--json]
@@ -177,11 +282,104 @@ aitools gemini generate "Abstract gradient banner" -o banner.png -a 16:9
 # Generate a phone wallpaper (9:16 portrait)
 aitools gemini generate "Mountain sunset wallpaper" -o wallpaper.png -a 9:16
 
-# Generate with default filename (generated_image.png)
-aitools gemini generate "Modern EV charging station"
-
 # Get JSON output
 aitools gemini generate "Abstract art in blue tones" -o art.png --json
+```
+
+### Resend Email
+
+```bash
+aitools resend inbox [--limit 20] [--json]
+aitools resend read EMAIL_ID [--json]
+aitools resend send --from "noreply@example.com" --to "user@example.com" --subject "Subject" --body "Body"
+```
+
+### Google Analytics 4
+
+Requires GA4 Data API enabled in Google Cloud (free, 25K requests/day).
+
+```bash
+# Run a report with dimensions and metrics
+aitools analytics ga4 report PROPERTY_ID -d date -m sessions,activeUsers --start 7daysAgo --end yesterday --json
+
+# Traffic by source over 90 days
+aitools analytics ga4 report PROPERTY_ID -d date,sessionSource,sessionMedium -m sessions,activeUsers --start 90daysAgo --json
+```
+
+### GitHub Analytics
+
+Uses `gh` CLI (must be authenticated via `gh auth login`).
+
+```bash
+# Repository stats (stars, forks, watchers)
+aitools analytics github stats owner/repo --json
+
+# Traffic data (views + clones, last 14 days)
+aitools analytics github traffic owner/repo --json
+
+# Popular referrers
+aitools analytics github referrers owner/repo --json
+```
+
+### SEO — Lighthouse
+
+Run local Lighthouse audits (requires `npm install -g lighthouse`).
+
+```bash
+# Full audit (performance, SEO, accessibility, best practices)
+aitools seo lighthouse https://example.com --json
+
+# Desktop-only, performance only
+aitools seo lighthouse https://example.com --device desktop --category performance,seo
+```
+
+Output includes scores, Core Web Vitals, and failing audits.
+
+### SEO — PageSpeed Insights
+
+Run Google's PageSpeed Insights API (includes both lab data and CrUX field data).
+
+```bash
+# Mobile analysis (default)
+aitools seo pagespeed https://example.com --json
+
+# Desktop with specific categories
+aitools seo pagespeed https://example.com --strategy desktop --category performance
+
+# With API key for higher rate limits
+aitools seo pagespeed https://example.com --api-key YOUR_KEY --json
+```
+
+Output includes Lighthouse scores, Core Web Vitals (LCP, TBT, CLS, FCP, SI, TTI), CrUX field data, and performance opportunities with estimated savings.
+
+### SEO — Google Autocomplete
+
+Free keyword research using Google's autocomplete suggestions.
+
+```bash
+# English suggestions
+aitools seo autocomplete "blood test tracking" --json
+
+# Turkish suggestions, Turkey region
+aitools seo autocomplete "kan tahlili" --lang tr --country TR
+
+# German suggestions, Germany region
+aitools seo autocomplete "bluttest ergebnisse" --lang de --country DE
+```
+
+### SEO — Serper (SERP Analysis)
+
+Search Google via Serper.dev API. Returns organic results, People Also Ask, and related searches.
+
+```bash
+# Basic search
+aitools seo serper "blood test app" --num 5
+
+# Localized search
+aitools seo serper "kan tahlili takip" --country tr --lang tr --json
+
+# News search
+aitools seo serper "health tracking app" --type news --json
 ```
 
 ## Using with Claude Code
@@ -220,34 +418,44 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
       "Bash(*aitools notion verify*)",
       "Bash(*aitools granola*)",
       "Bash(*aitools*--help*)",
-      "Bash(*aitools gemini*)"
+      "Bash(*aitools gemini*)",
+      "Bash(*aitools resend inbox*)",
+      "Bash(*aitools resend read*)",
+      "Bash(*aitools analytics*)",
+      "Bash(*aitools seo*)"
     ]
   }
 }
 ```
 
 **What this allows (no prompts):**
-| Service | Auto-allowed operations |
-|---------|------------------------|
-| Gmail | search, read, list, draft, labels, drafts, label create, modify, archive, batch-modify |
-| Calendar | list, get, calendars |
-| Notion | tasks list/get/update, page get/blocks/append/update/search |
-| Granola | all (read-only) |
-| Gemini | all (image generation) |
-| Help | all --help commands |
+
+| Service   | Auto-allowed operations                                                                |
+| --------- | -------------------------------------------------------------------------------------- |
+| Gmail     | search, read, list, draft, labels, drafts, label create, modify, archive, batch-modify |
+| Calendar  | list, get, calendars                                                                   |
+| Notion    | tasks list/get/update, page get/blocks/append/update/search                            |
+| Granola   | all (read-only)                                                                        |
+| Gemini    | all (image generation)                                                                 |
+| Resend    | inbox, read                                                                            |
+| Analytics | all GA4 reports, all GitHub stats (read-only)                                          |
+| SEO       | all (lighthouse, pagespeed, autocomplete, serper — all read-only)                      |
+| Help      | all --help commands                                                                    |
 
 **What still requires approval:**
-| Service | Requires confirmation |
-|---------|----------------------|
-| Gmail | send (if implemented), trash |
-| Calendar | create, delete |
-| Notion | tasks create/delete, page delete |
+
+| Service  | Requires confirmation            |
+| -------- | -------------------------------- |
+| Gmail    | send (if implemented), trash     |
+| Calendar | create, delete                   |
+| Notion   | tasks create/delete, page delete |
+| Resend   | send                             |
 
 This keeps read operations fast while protecting against accidental creates/deletes.
 
 ### Skill Setup
 
-Create Claude Code skills for different capabilities. **Keep skills focused** - don't put everything in one skill.
+Create Claude Code skills for different capabilities. **Keep skills focused** -- don't put everything in one skill.
 
 ### 1. Install the library
 
@@ -333,12 +541,17 @@ Now when you ask Claude "what's on my calendar?" or "add a task to buy groceries
 
 Environment variables:
 
-| Variable                  | Description                      | Default          |
-| ------------------------- | -------------------------------- | ---------------- |
-| `AITOOLS_CREDENTIALS_DIR` | Override credentials directory   | `./credentials`  |
-| `AITOOLS_TIMEZONE`        | Timezone for calendar operations | `UTC`            |
-| `NOTION_API_KEY`          | Notion API key                   | (from .env file) |
-| `GEMINI_API_KEY`          | Gemini API key for image gen     | (from .env file) |
+| Variable                   | Description                           | Default            |
+| -------------------------- | ------------------------------------- | ------------------ |
+| `AITOOLS_CREDENTIALS_DIR`  | Override credentials directory        | `./credentials`    |
+| `AITOOLS_TIMEZONE`         | Timezone for calendar operations      | `UTC`              |
+| `NOTION_API_KEY`           | Notion API key                        | (from .env file)   |
+| `GEMINI_API_KEY`           | Gemini API key for image gen          | (from .env file)   |
+| `RESEND_API_KEY`           | Resend API key for email              | (from .env file)   |
+| `GA4_SERVICE_ACCOUNT_JSON` | GA4 service account JSON string (CI)  | --                 |
+| `GA4_SERVICE_ACCOUNT_FILE` | Path to GA4 service account JSON file | --                 |
+| `PAGESPEED_API_KEY`        | Google PageSpeed API key (optional)   | --                 |
+| `SERPER_API_KEY`           | Serper.dev API key                    | (from config file) |
 
 ## Security Notes
 
@@ -353,7 +566,7 @@ Environment variables:
 
 ```bash
 # Clone and install with dev dependencies
-git clone https://github.com/yourusername/ai-agent-tools.git
+git clone https://github.com/jnuo/ai-agent-tools.git
 cd ai-agent-tools
 pip install -e ".[all,dev]"
 ```
@@ -394,13 +607,13 @@ pytest
 
 ### Test Structure
 
-- **Unit tests** (`tests/notion/`, `tests/google/`): Fast, mocked, run automatically in CI
+- **Unit tests** (`tests/notion/`, `tests/google/`, `tests/seo/`): Fast, mocked, run automatically in CI
 - **Integration tests** (`tests/integration/`): Real API calls, run locally before PRs
 - **Fixtures**: Shared test data in `tests/conftest.py`
 
 ### CI/CD
 
-GitHub Actions runs unit tests automatically on every push and PR. Integration tests are **local-only** - run them manually before creating PRs.
+GitHub Actions runs unit tests automatically on every push and PR. Integration tests are **local-only** -- run them manually before creating PRs.
 
 ```bash
 # CI runs this automatically
@@ -430,20 +643,41 @@ ai-agent-tools/
 │   ├── granola/
 │   │   ├── meetings.py     # Meeting/transcript reading
 │   │   └── cli.py          # Granola CLI commands
-│   └── gemini/
-│       ├── auth.py         # API key handling
-│       ├── image.py        # Image generation
-│       └── cli.py          # Gemini CLI commands
+│   ├── gemini/
+│   │   ├── auth.py         # API key handling
+│   │   ├── image.py        # Image generation
+│   │   └── cli.py          # Gemini CLI commands
+│   ├── resend/
+│   │   ├── auth.py         # API key handling
+│   │   ├── mail.py         # Inbox + send operations
+│   │   └── cli.py          # Resend CLI commands
+│   ├── analytics/
+│   │   ├── auth.py         # GA4 OAuth/service account + gh CLI
+│   │   ├── ga4.py          # GA4 Data API reports
+│   │   ├── github.py       # GitHub traffic, stars, referrers
+│   │   └── cli.py          # Analytics CLI commands
+│   └── seo/
+│       ├── lighthouse.py   # Local Lighthouse audit runner
+│       ├── pagespeed.py    # PageSpeed Insights API v5
+│       ├── autocomplete.py # Google Autocomplete suggestions
+│       ├── serper.py       # Serper.dev SERP API
+│       └── cli.py          # SEO CLI commands
 ├── tests/
 │   ├── conftest.py         # Shared fixtures
 │   ├── google/             # Google module tests
-│   └── notion/             # Notion module tests
+│   ├── notion/             # Notion module tests
+│   ├── granola/            # Granola module tests
+│   ├── seo/                # SEO module tests
+│   └── integration/        # Integration tests (real API calls)
+├── docs/
+│   └── granola.md          # Granola setup & usage
 ├── .github/workflows/
 │   └── test.yml            # CI workflow
 ├── credentials/            # (gitignored)
 │   ├── google/
 │   ├── notion/
-│   └── gemini/
+│   ├── gemini/
+│   └── resend/
 └── examples/
     ├── claude-skill-template.md        # Productivity skill (tasks, calendar, email)
     └── gemini-image-skill-template.md  # Image generation skill
