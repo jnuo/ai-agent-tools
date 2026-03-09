@@ -84,11 +84,26 @@ def _load_gemini():
         return gemini
 
 
+def _load_seo():
+    """Load SEO CLI (DataForSEO integration)."""
+    try:
+        from .seo.cli import seo
+        return seo
+    except ImportError as e:
+        @click.group()
+        def seo():
+            """SEO operations (not available)"""
+            click.echo(f"SEO module not available: {e}", err=True)
+            raise SystemExit(1)
+        return seo
+
+
 # Register subcommands
 main.add_command(_load_google())
 main.add_command(_load_notion())
 main.add_command(_load_granola())
 main.add_command(_load_gemini())
+main.add_command(_load_seo())
 
 
 if __name__ == "__main__":
