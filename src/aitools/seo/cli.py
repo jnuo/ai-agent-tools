@@ -1,16 +1,230 @@
-"""CLI for SEO tools (Lighthouse, PageSpeed, keyword volume, SERP)."""
+"""CLI for SEO tools (Lighthouse, PageSpeed, keyword volume, SERP, GSC Intelligence)."""
 
 import json
+from pathlib import Path
 
 import click
 
 from . import volume
+from .gsc import DEFAULT_DB, GscDb
 
 
 @click.group()
 def seo():
-    """SEO operations (keyword research, Lighthouse, PageSpeed, SERP)."""
+    """SEO operations (keyword research, Lighthouse, PageSpeed, SERP, GSC)."""
     pass
+
+
+# =============================================================================
+# GSC Intelligence
+# =============================================================================
+
+@seo.group("gsc")
+def gsc_group():
+    """GSC Intelligence — store, trend, and search Google Search Console data."""
+    pass
+
+
+@gsc_group.command("add-site")
+@click.argument("url")
+@click.argument("product")
+@click.option("--db", default=str(DEFAULT_DB), help="Path to gsc.db")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def gsc_add_site(url: str, product: str, db: str, as_json: bool):
+    """Register a GSC property for tracking.
+
+    Examples:
+        aitools seo gsc add-site "sc-domain:viziai.app" viziai
+        aitools seo gsc add-site "https://etko.app/" etko
+    """
+    gsc = GscDb(Path(db))
+    site_id = gsc.add_site(url, product)
+    gsc.close()
+    if as_json:
+        click.echo(json.dumps({"id": site_id, "url": url, "product": product}))
+    else:
+        click.echo(f"Site registered: {product} → {url} (id={site_id})")
+
+
+@gsc_group.command("sites")
+@click.option("--db", default=str(DEFAULT_DB), help="Path to gsc.db")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def gsc_sites(db: str, as_json: bool):
+    """List tracked GSC sites."""
+    gsc = GscDb(Path(db))
+    sites = gsc.list_sites()
+    gsc.close()
+    if as_json:
+        click.echo(json.dumps(sites, indent=2))
+    else:
+        if not sites:
+            click.echo("No sites registered. Use 'aitools seo gsc add-site' first.")
+            return
+        click.echo("\nTracked GSC Sites:")
+        click.echo("-" * 50)
+        for s in sites:
+            click.echo(f"  [{s['id']}] {s['product']:<12} {s['url']}")
+
+
+@gsc_group.command("import")
+@click.argument("data_file", type=click.Path(exists=True))
+@click.option("--site", required=True, help="GSC property URL")
+@click.option("--start", "start_date", required=True, help="Period start (YYYY-MM-DD)")
+@click.option("--end", "end_date", required=True, help="Period end (YYYY-MM-DD)")
+@click.option("--db", default=str(DEFAULT_DB), help="Path to gsc.db")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def gsc_import(data_file: str, site: str, start_date: str, end_date: str, db: str, as_json: bool):
+    """Import GSC performance data from a JSON file.
+
+    The JSON file should contain an array of objects with keys:
+    query, page, clicks, impressions, ctr, position.
+
+    Examples:
+        aitools seo gsc import /tmp/gsc_data.json --site "sc-domain:viziai.app" --start 2026-02-19 --end 2026-03-19
+    """
+    gsc = GscDb(Path(db))
+    with open(data_file) as f:
+        rows = json.load(f)
+
+    result = gsc.import_data(site, start_date, end_date, rows)
+    gsc.close()
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+    else:
+        click.echo(f"Imported {result['rows_imported']} rows for {result['site']} ({result['period']})")
+
+
+@gsc_group.command("trends")
+@click.option("--site", required=True, help="GSC property URL")
+@click.option("--limit", default=20, help="Max results per category")
+@click.option("--db", default=str(DEFAULT_DB), help="Path to gsc.db")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def gsc_trends(site: str, limit: int, db: str, as_json: bool):
+    """Show month-over-month trends for a site.
+
+    Compares the latest two snapshots and classifies queries as:
+    rising, declining, new, or lost.
+
+    Examples:
+        aitools seo gsc trends --site "sc-domain:viziai.app"
+        aitools seo gsc trends --site "sc-domain:etko.app" --limit 10 --json
+    """
+    gsc = GscDb(Path(db))
+    result = gsc.compute_trends(site, limit=limit)
+    gsc.close()
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    if "error" in result:
+        click.echo(f"Error: {result['error']}")
+        return
+
+    if result["mode"] == "single_snapshot":
+        click.echo(f"\n{result['site']} — Single snapshot ({result['period']})")
+        click.echo(f"Total rows: {result['total_rows']}")
+        click.echo(f"\nTop queries by impressions:")
+        click.echo(f"{'Query':<45} {'Clicks':>7} {'Impr':>8} {'Pos':>6}")
+        click.echo("-" * 70)
+        for r in result["top_queries"]:
+            q = r["query"][:44]
+            click.echo(f"{q:<45} {r['clicks']:>7} {r['impressions']:>8} {r['position']:>6.1f}")
+        return
+
+    click.echo(f"\n{result['site']} — Trends")
+    click.echo(f"Current:  {result['current_period']}")
+    click.echo(f"Previous: {result['previous_period']}")
+    click.echo(f"Rising: {result['counts']['rising']} | Declining: {result['counts']['declining']} | New: {result['counts']['new']} | Lost: {result['counts']['lost']}")
+
+    for category, label, extra_cols in [
+        ("rising", "RISING", True),
+        ("declining", "DECLINING", True),
+        ("new", "NEW QUERIES", False),
+        ("lost", "LOST QUERIES", False),
+    ]:
+        items = result[category]
+        if not items:
+            continue
+        click.echo(f"\n{'─' * 70}")
+        click.echo(f"  {label} ({len(items)})")
+        click.echo(f"{'─' * 70}")
+
+        if extra_cols:
+            click.echo(f"  {'Query':<35} {'Impr Now':>9} {'Impr Prev':>10} {'Change':>8} {'Pos':>6}")
+            for r in items:
+                q = r["query"][:34]
+                click.echo(
+                    f"  {q:<35} {r['imp_now']:>9} {r['imp_prev']:>10} "
+                    f"{r['imp_change_pct']:>+7.1f}% {r['pos_now']:>5.1f}"
+                )
+        else:
+            click.echo(f"  {'Query':<40} {'Clicks':>7} {'Impr':>8} {'Pos':>6}")
+            for r in items:
+                q = r["query"][:39]
+                click.echo(f"  {q:<40} {r['clicks']:>7} {r['impressions']:>8} {r['position']:>6.1f}")
+
+
+@gsc_group.command("search")
+@click.argument("text")
+@click.option("--site", default=None, help="Filter by GSC property URL")
+@click.option("--limit", default=20, help="Max results")
+@click.option("--db", default=str(DEFAULT_DB), help="Path to gsc.db")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def gsc_search(text: str, site: str, limit: int, db: str, as_json: bool):
+    """Full-text search over stored GSC queries.
+
+    Examples:
+        aitools seo gsc search "blood test" --site "sc-domain:viziai.app"
+        aitools seo gsc search "etkinlik" --json
+    """
+    gsc = GscDb(Path(db))
+    results = gsc.search(text, site_url=site, limit=limit)
+    gsc.close()
+
+    if as_json:
+        click.echo(json.dumps(results, indent=2))
+        return
+
+    if not results:
+        click.echo(f"No results for '{text}'")
+        return
+
+    click.echo(f"\nSearch: '{text}' ({len(results)} results)")
+    click.echo(f"{'Query':<35} {'Page':<25} {'Clicks':>7} {'Impr':>8} {'Product':<10}")
+    click.echo("-" * 90)
+    for r in results:
+        q = r["query"][:34]
+        pg = r["page"].split("/")[-1][:24] if r["page"] else ""
+        click.echo(f"{q:<35} {pg:<25} {r['clicks']:>7} {r['impressions']:>8} {r['product']:<10}")
+
+
+@gsc_group.command("stats")
+@click.option("--db", default=str(DEFAULT_DB), help="Path to gsc.db")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def gsc_stats(db: str, as_json: bool):
+    """Show database statistics."""
+    gsc = GscDb(Path(db))
+    result = gsc.stats()
+    gsc.close()
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    if not result["sites"]:
+        click.echo("Database is empty. Add sites first.")
+        return
+
+    click.echo(f"\nGSC Intelligence Database")
+    click.echo(f"Total: {result['total_snapshots']} snapshots, {result['total_rows']} rows")
+    click.echo("-" * 70)
+    for s in result["sites"]:
+        click.echo(f"  {s['product']:<12} {s['url']}")
+        click.echo(f"    Snapshots: {s['snapshots']}  |  Rows: {s['total_rows']}  |  Latest: {s['latest_period']}")
+        click.echo(f"    Last pulled: {s['last_pulled']}")
+    click.echo()
 
 
 # =============================================================================

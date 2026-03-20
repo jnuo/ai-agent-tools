@@ -2,7 +2,7 @@
 
 ![AI Agent Tools Banner](banner.jpeg)
 
-A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, Gemini (image generation), Resend (email), Google Analytics 4, GitHub analytics, and SEO tools (Lighthouse, PageSpeed, Google Autocomplete, Serper SERP, DataForSEO keyword volume). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
+A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, Gemini (image generation), Resend (email), Google Analytics 4, GitHub analytics, and SEO tools (Lighthouse, PageSpeed, Google Autocomplete, Serper SERP, DataForSEO keyword volume, GSC Intelligence). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
 
 ## Why This Exists
 
@@ -81,6 +81,13 @@ aitools seo serper "kan tahlili takip" --country tr --lang tr --json
 # SEO — DataForSEO Keyword Volume
 aitools seo volume "buy laptop" "cheap laptops" --json
 aitools seo volume "laptop kaufen" -c de -l de --json
+
+# SEO — GSC Intelligence (store, trend, search Google Search Console data)
+aitools seo gsc add-site "sc-domain:example.com" "my-product"
+aitools seo gsc import /tmp/gsc_data.json --site "sc-domain:example.com" --start 2026-02-19 --end 2026-03-19
+aitools seo gsc trends --site "sc-domain:example.com" --json
+aitools seo gsc search "keyword" --json
+aitools seo gsc stats
 ```
 
 ## Credentials Setup
@@ -426,6 +433,36 @@ aitools seo languages
 
 Output includes search volume, CPC, competition level, competition index, and monthly search trends.
 
+### SEO — GSC Intelligence
+
+Store Google Search Console performance data in a local SQLite database, compute month-over-month trends, and search across your properties. Inspired by [metehan777/vectordb-gsc](https://github.com/metehan777/vectordb-gsc) — thanks to Metehan for the approach of turning GSC data into a queryable local database. This implementation uses SQLite + FTS5 instead of vector embeddings for simplicity.
+
+```bash
+# Register a GSC property
+aitools seo gsc add-site "sc-domain:example.com" "my-product"
+
+# Import performance data from a JSON file (exported from GSC API/MCP)
+aitools seo gsc import /tmp/gsc_data.json --site "sc-domain:example.com" --start 2026-02-19 --end 2026-03-19
+
+# Compute month-over-month trends (rising, declining, new, lost queries)
+aitools seo gsc trends --site "sc-domain:example.com"
+aitools seo gsc trends --site "sc-domain:example.com" --limit 10 --json
+
+# Full-text search across stored queries
+aitools seo gsc search "blood test" --site "sc-domain:example.com"
+aitools seo gsc search "etkinlik"  # search across all sites
+
+# Database overview
+aitools seo gsc stats
+
+# List tracked sites
+aitools seo gsc sites
+```
+
+The database path defaults to `~/Documents/code/RoboPM/scripts/data/gsc.db` but can be overridden with `--db /path/to/gsc.db` on any command.
+
+**Data flow:** Pull GSC data via the Google Search Console API or MCP tool → save as JSON → import into SQLite → query trends and search.
+
 ## Using with Claude Code
 
 The best way to use this library is with Claude Code. Below are recommended permission settings and skill setup.
@@ -709,6 +746,8 @@ ai-agent-tools/
 │       ├── pagespeed.py    # PageSpeed Insights API v5
 │       ├── autocomplete.py # Google Autocomplete suggestions
 │       ├── serper.py       # Serper.dev SERP API
+│       ├── gsc.py          # GSC Intelligence (SQLite storage, trends, FTS5 search)
+│       ├── gsc_schema.sql  # GSC database schema
 │       └── cli.py          # SEO CLI commands
 ├── tests/
 │   ├── conftest.py         # Shared fixtures
@@ -731,6 +770,10 @@ ai-agent-tools/
     ├── claude-skill-template.md        # Productivity skill (tasks, calendar, email)
     └── gemini-image-skill-template.md  # Image generation skill
 ```
+
+## Credits
+
+- **GSC Intelligence** module inspired by [metehan777/vectordb-gsc](https://github.com/metehan777/vectordb-gsc) — the idea of turning Google Search Console data into a local queryable database with trend detection. Our implementation swaps ChromaDB + embeddings for SQLite + FTS5 for simplicity, but the core concept of persisting GSC snapshots and computing month-over-month trends comes from Metehan's work.
 
 ## License
 
