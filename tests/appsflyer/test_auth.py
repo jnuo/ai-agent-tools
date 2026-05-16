@@ -1,0 +1,78 @@
+"""Unit tests for AppsFlyer auth helpers."""
+
+import pytest
+
+from aitools.appsflyer.auth import (
+    AppsFlyerAuthError,
+    AppsFlyerAPIError,
+    get_headers,
+    make_csv_request,
+)
+
+
+def test_get_headers_raises_without_token(monkeypatch):
+    monkeypatch.delenv("APPSFLYER_API_TOKEN", raising=False)
+    # Point credentials dir somewhere with no .env so the file fallback misses too
+    monkeypatch.setenv("AITOOLS_CREDENTIALS_DIR", "/tmp/aitools-test-nope")
+
+    with pytest.raises(AppsFlyerAuthError):
+        get_headers()
+
+
+def test_get_headers_uses_env_token(monkeypatch):
+    monkeypatch.setenv("APPSFLYER_API_TOKEN", "fake-token-abc")
+    headers = get_headers()
+    assert headers["Authorization"] == "Bearer fake-token-abc"
+    assert headers["Accept"] == "text/csv"
+
+
+def test_get_headers_explicit_override():
+    headers = get_headers(api_token="explicit-token")
+    assert headers["Authorization"] == "Bearer explicit-token"
+
+
+def test_make_csv_request_parses_csv(monkeypatch):
+    """CSV parsing path — uses responses library to mock HTTP."""
+    pytest.importorskip("responses")
+    import responses
+
+    monkeypatch.setenv("APPSFLYER_API_TOKEN", "fake-token")
+
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://hq1.appsflyer.com/api/agg-data/export/app/com.example/daily_report/v5",
+            body="Date,Installs\n2026-05-15,42\n2026-05-16,55\n",
+            status=200,
+            content_type="text/csv",
+        )
+
+        rows = make_csv_request(
+            "/api/agg-data/export/app/com.example/daily_report/v5",
+            params={"from": "2026-05-15", "to": "2026-05-16"},
+        )
+
+    assert len(rows) == 2
+    assert rows[0] == {"Date": "2026-05-15", "Installs": "42"}
+    assert rows[1] == {"Date": "2026-05-16", "Installs": "55"}
+
+
+def test_make_csv_request_handles_401(monkeypatch):
+    pytest.importorskip("responses")
+    import responses
+
+    monkeypatch.setenv("APPSFLYER_API_TOKEN", "bad-token")
+
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://hq1.appsflyer.com/api/agg-data/export/app/com.example/daily_report/v5",
+            body="unauthorized",
+            status=401,
+        )
+
+        with pytest.raises(AppsFlyerAuthError):
+            make_csv_request(
+                "/api/agg-data/export/app/com.example/daily_report/v5",
+                params={"from": "2026-05-15", "to": "2026-05-15"},
+            )

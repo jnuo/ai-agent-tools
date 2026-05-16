@@ -47,8 +47,11 @@ analytics = [
 seo = [
     "httpx>=0.27.0",
 ]
+appsflyer = [
+    "requests>=2.31.0",
+]
 all = [
-    "ai-agent-tools[google,notion,gemini,resend,analytics,seo]",
+    "ai-agent-tools[google,notion,gemini,resend,analytics,seo,appsflyer]",
 ]
 dev = [
     "pytest>=8.0.0",
