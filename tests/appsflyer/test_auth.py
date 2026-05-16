@@ -5,6 +5,7 @@ import pytest
 from aitools.appsflyer.auth import (
     AppsFlyerAuthError,
     AppsFlyerAPIError,
+    AppsFlyerRateLimitError,
     get_headers,
     make_csv_request,
 )
@@ -69,6 +70,50 @@ def test_make_csv_request_handles_401(monkeypatch):
             "https://hq1.appsflyer.com/api/agg-data/export/app/com.example/daily_report/v5",
             body="unauthorized",
             status=401,
+        )
+
+        with pytest.raises(AppsFlyerAuthError):
+            make_csv_request(
+                "/api/agg-data/export/app/com.example/daily_report/v5",
+                params={"from": "2026-05-15", "to": "2026-05-15"},
+            )
+
+
+def test_make_csv_request_distinguishes_403_rate_limit(monkeypatch):
+    """AppsFlyer overloads 403 for both auth and rate-limit; we should split them."""
+    pytest.importorskip("responses")
+    import responses
+
+    monkeypatch.setenv("APPSFLYER_API_TOKEN", "valid-token")
+
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://hq1.appsflyer.com/api/agg-data/export/app/com.example/geo_report/v5",
+            body="Limit reached for country-report",
+            status=403,
+        )
+
+        with pytest.raises(AppsFlyerRateLimitError):
+            make_csv_request(
+                "/api/agg-data/export/app/com.example/geo_report/v5",
+                params={"from": "2026-05-09", "to": "2026-05-15"},
+            )
+
+
+def test_make_csv_request_403_without_limit_is_auth_error(monkeypatch):
+    """A 403 with no 'limit'/'quota' wording is treated as auth, not rate-limit."""
+    pytest.importorskip("responses")
+    import responses
+
+    monkeypatch.setenv("APPSFLYER_API_TOKEN", "valid-but-scoped-out")
+
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://hq1.appsflyer.com/api/agg-data/export/app/com.example/daily_report/v5",
+            body="forbidden — app not in your account",
+            status=403,
         )
 
         with pytest.raises(AppsFlyerAuthError):

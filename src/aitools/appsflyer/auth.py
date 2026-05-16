@@ -31,6 +31,17 @@ class AppsFlyerAPIError(Exception):
     pass
 
 
+class AppsFlyerRateLimitError(AppsFlyerAPIError):
+    """Raised when AppsFlyer returns a rate-limit error (often surfaced as 403).
+
+    The Aggregate Pull API enforces strict per-report quotas (24/day/app for
+    multi-day ranges, 1/min for short ranges). When exceeded, AppsFlyer
+    returns 403 with a body like 'Limit reached for <report>-report' — this is
+    NOT an auth failure even though the status code suggests it.
+    """
+    pass
+
+
 def get_headers(api_token: Optional[str] = None) -> dict:
     """Get headers for AppsFlyer API requests.
 
@@ -91,11 +102,29 @@ def make_csv_request(
 
     response = requests.get(url, headers=headers, params=params or {}, timeout=timeout)
 
-    if response.status_code in (401, 403):
+    if response.status_code == 401:
         raise AppsFlyerAuthError(
-            f"AppsFlyer auth failed ({response.status_code}). "
-            f"Token may be invalid, expired, or revoked. "
-            f"Response: {response.text[:200]}"
+            f"AppsFlyer auth failed (401). Token may be invalid, expired, "
+            f"or revoked. Response: {response.text[:200]}"
+        )
+    if response.status_code == 403:
+        # 403 from AppsFlyer is overloaded: it can be auth OR rate-limit.
+        # Rate-limit responses contain "limit" or "quota" in the body.
+        body_lower = response.text.lower()
+        if "limit" in body_lower or "quota" in body_lower:
+            raise AppsFlyerRateLimitError(
+                f"AppsFlyer rate limit hit (403): {response.text[:200]}. "
+                f"Aggregate Pull API limits: 24/day per app for multi-day "
+                f"ranges, 120/day per account. Wait and retry, or narrow the "
+                f"date range."
+            )
+        raise AppsFlyerAuthError(
+            f"AppsFlyer auth failed (403). Token may not have access to this "
+            f"app/report. Response: {response.text[:200]}"
+        )
+    if response.status_code == 429:
+        raise AppsFlyerRateLimitError(
+            f"AppsFlyer rate limit (429): {response.text[:200]}"
         )
     if response.status_code == 404:
         raise AppsFlyerAPIError(
