@@ -121,3 +121,61 @@ def test_make_request_403_without_limit_is_auth_error(monkeypatch):
                 "/api/agg-data/export/app/com.example/daily_report/v5",
                 params={"from": "2026-05-15", "to": "2026-05-15"},
             )
+
+
+def test_make_request_403_empty_body_is_api_error_not_auth(monkeypatch):
+    """A 403 with empty body is most likely a transient gateway — don't tell
+    the user to regenerate their token."""
+    pytest.importorskip("responses")
+    import responses
+
+    monkeypatch.setenv("APPSFLYER_API_TOKEN", "valid-token")
+
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://hq1.appsflyer.com/api/agg-data/export/app/com.example/daily_report/v5",
+            body="",
+            status=403,
+        )
+
+        with pytest.raises(AppsFlyerAPIError) as exc_info:
+            make_request(
+                "/api/agg-data/export/app/com.example/daily_report/v5",
+                params={"from": "2026-05-15", "to": "2026-05-15"},
+            )
+
+        # Must NOT be AppsFlyerAuthError (that prompts token regeneration)
+        assert not isinstance(exc_info.value, AppsFlyerAuthError)
+        # Must NOT be AppsFlyerRateLimitError either — empty body is ambiguous
+        assert not isinstance(exc_info.value, AppsFlyerRateLimitError)
+
+
+def test_sanitize_strips_ansi_from_error_bodies(monkeypatch):
+    """Control characters in the response body must not leak into terminals."""
+    pytest.importorskip("responses")
+    import responses
+
+    monkeypatch.setenv("APPSFLYER_API_TOKEN", "valid-token")
+
+    # Body contains an ANSI escape sequence that would normally clear the
+    # terminal and reposition the cursor.
+    hostile_body = "\x1b[2J\x1b[H<INVISIBLE TAKEOVER>"
+
+    with responses.RequestsMock() as rsps:
+        rsps.add(
+            responses.GET,
+            "https://hq1.appsflyer.com/api/agg-data/export/app/com.example/daily_report/v5",
+            body=hostile_body,
+            status=401,
+        )
+
+        with pytest.raises(AppsFlyerAuthError) as exc_info:
+            make_request(
+                "/api/agg-data/export/app/com.example/daily_report/v5",
+                params={"from": "2026-05-15", "to": "2026-05-15"},
+            )
+
+        msg = str(exc_info.value)
+        assert "\x1b" not in msg
+        assert "<INVISIBLE TAKEOVER>" in msg

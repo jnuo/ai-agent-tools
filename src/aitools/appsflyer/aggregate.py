@@ -7,12 +7,39 @@ Aggregate endpoints have generous rate limits compared to raw data:
 Docs: https://support.appsflyer.com/hc/en-us/articles/207034346-Pull-API-aggregate-data
 """
 
+import re
+from datetime import date
 from typing import Optional
 
 from .auth import make_request
 
 _AGG_BASE = "/api/agg-data/export/app"
 _REPORT_VERSION = "v5"
+
+# Real AppsFlyer app IDs are either "id<digits>" (iOS) or reverse-DNS package
+# names (Android). Rejecting anything else prevents path-traversal in the URL
+# (e.g., "../something/else") and surfaces typos early.
+_APP_ID_RE = re.compile(r"^[\w.\-]+$")
+
+
+def _validate_app_id(app_id: str) -> None:
+    if not _APP_ID_RE.match(app_id):
+        raise ValueError(
+            f"Invalid app_id {app_id!r}. Expected iOS ID like 'id6761076847' "
+            f"or Android package name like 'com.salta.dos'."
+        )
+
+
+def _validate_date_range(date_from: str, date_to: str) -> None:
+    try:
+        start = date.fromisoformat(date_from)
+        end = date.fromisoformat(date_to)
+    except ValueError as e:
+        raise ValueError(f"Dates must be YYYY-MM-DD: {e}") from e
+    if start > end:
+        raise ValueError(
+            f"date_from ({date_from}) must be <= date_to ({date_to})."
+        )
 
 
 def _report(
@@ -26,6 +53,9 @@ def _report(
     currency: Optional[str] = None,
 ) -> list[dict]:
     """Internal helper for all aggregate report calls."""
+    _validate_app_id(app_id)
+    _validate_date_range(date_from, date_to)
+
     params: dict = {"from": date_from, "to": date_to}
     if media_source:
         params["media_source"] = media_source

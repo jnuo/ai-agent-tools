@@ -28,6 +28,8 @@ def _safe_int(v) -> int:
 
 
 def _top_partners_by_installs(rows: list[dict], n: int = 5) -> list[dict]:
+    if n <= 0:
+        return []
     return sorted(
         rows,
         key=lambda r: _safe_int(r.get(_INSTALLS_COL, 0)),

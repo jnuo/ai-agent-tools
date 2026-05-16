@@ -11,11 +11,25 @@ Docs: https://dev.appsflyer.com/hc/reference/api-reference-overview
 
 import csv
 import io
+import re
 from typing import Optional
 
 import requests
 
 from ..config import get_appsflyer_api_token
+
+
+def _sanitize_for_terminal(text: str, limit: int = 200) -> str:
+    """Strip control characters (ANSI escape sequences, binary garbage) from
+    error response bodies before embedding them in exception messages.
+
+    Without this, a hostile or malformed AppsFlyer response could inject
+    terminal escape sequences when its body is printed in a traceback.
+    """
+    if not text:
+        return ""
+    truncated = text[:limit]
+    return re.sub(r"[\x00-\x1f\x7f]", "?", truncated)
 
 # AppsFlyer Pull API base URL (all V2 endpoints live here)
 APPSFLYER_API_BASE = "https://hq1.appsflyer.com"
@@ -105,29 +119,38 @@ def make_request(
 
     response = requests.get(url, headers=headers, params=params or {}, timeout=timeout)
 
+    body = _sanitize_for_terminal(response.text)
+
     if response.status_code == 401:
         raise AppsFlyerAuthError(
             f"AppsFlyer auth failed (401). Token may be invalid, expired, "
-            f"or revoked. Response: {response.text[:200]}"
+            f"or revoked. Response: {body}"
         )
     if response.status_code == 403:
         # 403 from AppsFlyer is overloaded: it can be auth OR rate-limit.
         # Rate-limit responses contain "limit" or "quota" in the body.
+        # An empty body is most likely a transient gateway/infra 403 — don't
+        # misclassify it as auth, which would prompt the user to regenerate.
         body_lower = response.text.lower()
+        if not body_lower:
+            raise AppsFlyerAPIError(
+                "AppsFlyer returned 403 with empty body — may be transient "
+                "rate-limit or gateway error. Retry before regenerating token."
+            )
         if "limit" in body_lower or "quota" in body_lower:
             raise AppsFlyerRateLimitError(
-                f"AppsFlyer rate limit hit (403): {response.text[:200]}. "
+                f"AppsFlyer rate limit hit (403): {body}. "
                 f"Aggregate Pull API limits: 24/day per app for multi-day "
                 f"ranges, 120/day per account. Wait and retry, or narrow the "
                 f"date range."
             )
         raise AppsFlyerAuthError(
             f"AppsFlyer auth failed (403). Token may not have access to this "
-            f"app/report. Response: {response.text[:200]}"
+            f"app/report. Response: {body}"
         )
     if response.status_code == 429:
         raise AppsFlyerRateLimitError(
-            f"AppsFlyer rate limit (429): {response.text[:200]}"
+            f"AppsFlyer rate limit (429): {body}"
         )
     if response.status_code == 404:
         raise AppsFlyerAPIError(
@@ -136,7 +159,8 @@ def make_request(
         )
     if not response.ok:
         raise AppsFlyerAPIError(
-            f"AppsFlyer API error ({response.status_code}): {response.text[:500]}"
+            f"AppsFlyer API error ({response.status_code}): "
+            f"{_sanitize_for_terminal(response.text, limit=500)}"
         )
 
     text = response.text.strip()
