@@ -7,7 +7,7 @@ from aitools.appsflyer.auth import (
     AppsFlyerAPIError,
     AppsFlyerRateLimitError,
     get_headers,
-    make_csv_request,
+    make_request,
 )
 
 
@@ -28,11 +28,11 @@ def test_get_headers_uses_env_token(monkeypatch):
 
 
 def test_get_headers_explicit_override():
-    headers = get_headers(api_token="explicit-token")
+    headers = get_headers(api_key="explicit-token")
     assert headers["Authorization"] == "Bearer explicit-token"
 
 
-def test_make_csv_request_parses_csv(monkeypatch):
+def test_make_request_parses_csv(monkeypatch):
     """CSV parsing path — uses responses library to mock HTTP."""
     pytest.importorskip("responses")
     import responses
@@ -48,7 +48,7 @@ def test_make_csv_request_parses_csv(monkeypatch):
             content_type="text/csv",
         )
 
-        rows = make_csv_request(
+        rows = make_request(
             "/api/agg-data/export/app/com.example/daily_report/v5",
             params={"from": "2026-05-15", "to": "2026-05-16"},
         )
@@ -58,7 +58,7 @@ def test_make_csv_request_parses_csv(monkeypatch):
     assert rows[1] == {"Date": "2026-05-16", "Installs": "55"}
 
 
-def test_make_csv_request_handles_401(monkeypatch):
+def test_make_request_handles_401(monkeypatch):
     pytest.importorskip("responses")
     import responses
 
@@ -73,13 +73,13 @@ def test_make_csv_request_handles_401(monkeypatch):
         )
 
         with pytest.raises(AppsFlyerAuthError):
-            make_csv_request(
+            make_request(
                 "/api/agg-data/export/app/com.example/daily_report/v5",
                 params={"from": "2026-05-15", "to": "2026-05-15"},
             )
 
 
-def test_make_csv_request_distinguishes_403_rate_limit(monkeypatch):
+def test_make_request_distinguishes_403_rate_limit(monkeypatch):
     """AppsFlyer overloads 403 for both auth and rate-limit; we should split them."""
     pytest.importorskip("responses")
     import responses
@@ -95,13 +95,13 @@ def test_make_csv_request_distinguishes_403_rate_limit(monkeypatch):
         )
 
         with pytest.raises(AppsFlyerRateLimitError):
-            make_csv_request(
+            make_request(
                 "/api/agg-data/export/app/com.example/geo_report/v5",
                 params={"from": "2026-05-09", "to": "2026-05-15"},
             )
 
 
-def test_make_csv_request_403_without_limit_is_auth_error(monkeypatch):
+def test_make_request_403_without_limit_is_auth_error(monkeypatch):
     """A 403 with no 'limit'/'quota' wording is treated as auth, not rate-limit."""
     pytest.importorskip("responses")
     import responses
@@ -117,7 +117,7 @@ def test_make_csv_request_403_without_limit_is_auth_error(monkeypatch):
         )
 
         with pytest.raises(AppsFlyerAuthError):
-            make_csv_request(
+            make_request(
                 "/api/agg-data/export/app/com.example/daily_report/v5",
                 params={"from": "2026-05-15", "to": "2026-05-15"},
             )

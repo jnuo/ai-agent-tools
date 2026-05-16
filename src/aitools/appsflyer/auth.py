@@ -42,11 +42,13 @@ class AppsFlyerRateLimitError(AppsFlyerAPIError):
     pass
 
 
-def get_headers(api_token: Optional[str] = None) -> dict:
+def get_headers(api_key: Optional[str] = None) -> dict:
     """Get headers for AppsFlyer API requests.
 
     Args:
-        api_token: Override token (uses config default if None)
+        api_key: Override token (uses config default if None). Named `api_key`
+            for consistency with other modules; the underlying credential is
+            an AppsFlyer V2 Bearer token.
 
     Returns:
         Headers dict including Bearer token
@@ -54,7 +56,7 @@ def get_headers(api_token: Optional[str] = None) -> dict:
     Raises:
         AppsFlyerAuthError: If no token found
     """
-    token = api_token or get_appsflyer_api_token()
+    token = api_key or get_appsflyer_api_token()
 
     if not token:
         raise AppsFlyerAuthError(
@@ -73,10 +75,10 @@ def get_headers(api_token: Optional[str] = None) -> dict:
     }
 
 
-def make_csv_request(
+def make_request(
     endpoint: str,
     params: Optional[dict] = None,
-    api_token: Optional[str] = None,
+    api_key: Optional[str] = None,
     timeout: int = 60,
 ) -> list[dict]:
     """Make an authenticated GET request to AppsFlyer and parse CSV response.
@@ -87,18 +89,19 @@ def make_csv_request(
     Args:
         endpoint: API path starting with '/' (e.g., '/api/agg-data/export/app/.../...')
         params: Query parameters dict
-        api_token: Override token
+        api_key: Override token (Bearer)
         timeout: Request timeout in seconds (default 60 — AppsFlyer reports can be slow)
 
     Returns:
         List of dicts (one per CSV row), empty list if no data rows
 
     Raises:
-        AppsFlyerAuthError: 401/403 response
+        AppsFlyerAuthError: 401/403 auth response
+        AppsFlyerRateLimitError: 403 rate-limit response or 429
         AppsFlyerAPIError: Other non-2xx responses
     """
     url = f"{APPSFLYER_API_BASE}{endpoint}"
-    headers = get_headers(api_token)
+    headers = get_headers(api_key)
 
     response = requests.get(url, headers=headers, params=params or {}, timeout=timeout)
 

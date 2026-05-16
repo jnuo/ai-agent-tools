@@ -5,5 +5,5 @@ from .auth import (
     AppsFlyerAPIError,
     AppsFlyerRateLimitError,
     get_headers,
-    make_csv_request,
+    make_request,
 )

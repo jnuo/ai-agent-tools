@@ -1,6 +1,8 @@
 """CLI for AppsFlyer Pull API operations."""
 
+import csv
 import json
+import sys
 
 import click
 
@@ -128,8 +130,6 @@ def _emit_rows(rows: list[dict], as_json: bool, as_csv: bool, label: str):
     if as_csv:
         if not rows:
             return
-        import csv
-        import sys
         writer = csv.DictWriter(sys.stdout, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
@@ -176,7 +176,7 @@ def _print_pulse(result: dict, weekly: bool):
         click.echo("─" * 60)
         totals = result.get("totals") or {}
         if totals:
-            click.echo(f"\nTotals:")
+            click.echo("\nTotals:")
             for k, v in totals.items():
                 click.echo(f"  {k}: {v}")
         else:

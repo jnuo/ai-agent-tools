@@ -9,9 +9,10 @@ Docs: https://support.appsflyer.com/hc/en-us/articles/207034346-Pull-API-aggrega
 
 from typing import Optional
 
-from .auth import make_csv_request
+from .auth import make_request
 
 _AGG_BASE = "/api/agg-data/export/app"
+_REPORT_VERSION = "v5"
 
 
 def _report(
@@ -35,8 +36,8 @@ def _report(
     if currency:
         params["currency"] = currency
 
-    return make_csv_request(
-        f"{_AGG_BASE}/{app_id}/{report_type}/v5",
+    return make_request(
+        f"{_AGG_BASE}/{app_id}/{report_type}/{_REPORT_VERSION}",
         params=params,
     )
 
