@@ -129,6 +129,35 @@ def _load_seo():
         return seo
 
 
+def _load_aso():
+    """Load ASO CLI (App Store + Play Store keyword/metadata intelligence)."""
+    try:
+        from .aso.cli import aso
+        return aso
+    except ImportError as e:
+        @click.group()
+        def aso():
+            """ASO operations (not available)."""
+            click.echo(f"ASO module not available: {e}", err=True)
+            raise SystemExit(1)
+        return aso
+
+
+def _load_appsflyer():
+    """Load AppsFlyer CLI (Pull API V2 — aggregate + pulse)."""
+    try:
+        from .appsflyer.cli import appsflyer
+        return appsflyer
+    except ImportError as e:
+        @click.group()
+        def appsflyer():
+            """AppsFlyer operations (not available - install with: pip install ai-agent-tools[appsflyer])"""
+            click.echo(f"AppsFlyer module not available: {e}", err=True)
+            click.echo("Install with: pip install ai-agent-tools[appsflyer]", err=True)
+            raise SystemExit(1)
+        return appsflyer
+
+
 # Register subcommands
 main.add_command(_load_google())
 main.add_command(_load_notion())
@@ -137,6 +166,8 @@ main.add_command(_load_gemini())
 main.add_command(_load_resend())
 main.add_command(_load_analytics())
 main.add_command(_load_seo())
+main.add_command(_load_aso())
+main.add_command(_load_appsflyer())
 
 
 if __name__ == "__main__":

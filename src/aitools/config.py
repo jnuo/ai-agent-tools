@@ -128,3 +128,38 @@ def get_resend_api_key() -> Optional[str]:
                         return line.split("=", 1)[1].strip().strip('"\'')
 
     return None
+
+
+def get_appsflyer_credentials_dir() -> Path:
+    """Get AppsFlyer credentials directory."""
+    return get_credentials_dir("appsflyer")
+
+
+def get_appsflyer_api_token() -> Optional[str]:
+    """Get AppsFlyer Pull API V2 Bearer token.
+
+    Priority:
+    1. APPSFLYER_API_TOKEN environment variable
+    2. .env file in appsflyer credentials directory
+
+    Returns:
+        Token string or None if not found
+    """
+    token = os.environ.get("APPSFLYER_API_TOKEN")
+    if token:
+        return token
+
+    env_file = get_appsflyer_credentials_dir() / ".env"
+    if env_file.exists():
+        try:
+            from dotenv import dotenv_values
+            values = dotenv_values(env_file)
+            return values.get("APPSFLYER_API_TOKEN")
+        except ImportError:
+            with open(env_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("APPSFLYER_API_TOKEN="):
+                        return line.split("=", 1)[1].strip().strip('"\'')
+
+    return None
