@@ -61,7 +61,7 @@ def ensure_request(app_id: str, access_type: str = "ONGOING") -> str:
     return auth.api_post("/v1/analyticsReportRequests", body)["data"]["id"]
 
 
-def _find_report_id(request_id: str, report_name: str) -> Optional[str]:
+def _find_report_id(request_id: str, report_name: str) -> str | None:
     reports = auth.paginate(
         f"/v1/analyticsReportRequests/{request_id}/reports", {"limit": 200}
     )
@@ -115,9 +115,16 @@ def _candidate_instances(app_id: str, report_name: str, date_from: str, date_to:
 def fetch_report_rows(app_id: str, report_name: str, date_from: str, date_to: str) -> list[dict]:
     """Segment rows whose data Date is in [date_from, date_to].
 
-    Rows are filtered by their own "Date" column (not the instance processingDate)
-    and de-duplicated by date: when several instances carry the same date, the one
-    with the newest processingDate wins (most complete/corrected data).
+    Rows are filtered by their own "Date" column (not the instance processingDate).
+    The same data date can appear in more than one instance (e.g. a ONGOING daily
+    instance and the ONE_TIME_SNAPSHOT), so we de-duplicate by date: for each date
+    we keep the single instance that carries the most rows for it (the most complete
+    copy), breaking ties deterministically by processingDate then instance id. This
+    avoids both double-counting and silently preferring a partial copy.
+
+    Note: every candidate instance's segments are downloaded (no early exit), since
+    a later instance may hold a more complete copy of an already-seen date. At
+    weekly-window scale this is a handful of small gzipped files.
 
     Raises ReportNotReady if the report exists but no in-range data is available.
     """
@@ -128,20 +135,20 @@ def fetch_report_rows(app_id: str, report_name: str, date_from: str, date_to: st
             f"Run `setup` and wait for Apple to produce it."
         )
 
-    claimed: set[str] = set()
-    rows: list[dict] = []
-    # Newest processingDate first so it claims each data date before older ones.
-    for _pdate, _access, inst_id in sorted(instances, key=lambda t: t[0], reverse=True):
+    # best[date] = (rank, rows) where rank = (row_count, processingDate, inst_id).
+    best: dict[str, tuple[tuple, list[dict]]] = {}
+    for pdate, _access, inst_id in instances:
         by_date: dict[str, list[dict]] = defaultdict(list)
         for r in _segment_rows(inst_id):
             d = r.get("Date", "")
             if date_from <= d <= date_to:
                 by_date[d].append(r)
         for d, rs in by_date.items():
-            if d not in claimed:
-                claimed.add(d)
-                rows.extend(rs)
+            rank = (len(rs), pdate, inst_id)
+            if d not in best or rank > best[d][0]:
+                best[d] = (rank, rs)
 
+    rows = [r for _date, (_rank, rs) in best.items() for r in rs]
     if not rows:
         raise ReportNotReady(
             f"Report '{report_name}' exists but no data for {date_from}..{date_to} "
@@ -204,13 +211,15 @@ def downloads(app_id: str, date_from: str, date_to: str) -> dict:
     rows = fetch_report_rows(app_id, DOWNLOADS_REPORT, date_from, date_to)
     download_rows = [r for r in rows if r.get("Download Type") in _DOWNLOAD_TYPES]
     first_time_rows = [r for r in rows if r.get("Download Type") == _FIRST_TIME]
+    daily = daily_totals(download_rows)
+    daily_ft = daily_totals(first_time_rows)
     return {
         "report": DOWNLOADS_REPORT,
         "range": {"from": date_from, "to": date_to},
-        "daily": daily_totals(download_rows),
-        "daily_first_time": daily_totals(first_time_rows),
-        "total": sum(daily_totals(download_rows).values()),
-        "total_first_time": sum(daily_totals(first_time_rows).values()),
+        "daily": daily,
+        "daily_first_time": daily_ft,
+        "total": sum(daily.values()),
+        "total_first_time": sum(daily_ft.values()),
         "by_download_type": breakdown_by(rows, "Download Type"),
         "by_territory": breakdown_by(download_rows, "Territory"),
         "columns": list(rows[0].keys()) if rows else [],

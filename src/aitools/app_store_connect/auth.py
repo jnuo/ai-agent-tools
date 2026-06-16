@@ -125,9 +125,16 @@ def download_report_segment(url: str, timeout: int = 120) -> list[dict]:
     Segment URLs are pre-signed; they take no Authorization header.
     """
     resp = requests.get(url, timeout=timeout)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise AscAPIError(
+            f"Failed to download report segment ({resp.status_code}). The "
+            f"pre-signed URL may have expired; retry the request."
+        )
     raw = gzip.decompress(resp.content).decode("utf-8")
+    lines = raw.splitlines()
+    if not lines or not lines[0].strip():
+        return []  # empty segment (a date with no events) — not an error
     # Analytics report segments are tab-separated despite the .csv naming.
-    dialect = "\t" if "\t" in raw.splitlines()[0] else ","
+    dialect = "\t" if "\t" in lines[0] else ","
     reader = csv.DictReader(io.StringIO(raw), delimiter=dialect)
     return list(reader)

@@ -96,9 +96,14 @@ def read_csv(object_name: str) -> list[dict]:
     bucket = _bucket()
     url = f"{_GCS}/{bucket}/o/{urllib.parse.quote(object_name, safe='')}?alt=media"
     raw = _get(url, creds.token, raw=True)
-    # Play report CSVs are UTF-16 (with BOM); fall back to utf-8 just in case.
-    try:
+    if not raw:
+        return []
+    # Play report CSVs are UTF-16 with a BOM. Detect by BOM rather than via
+    # try/except: a BOM-less UTF-8 body of even length decodes as UTF-16 WITHOUT
+    # raising, silently producing garbage column names (every field then reads as
+    # None -> all-zero data). Fall back to utf-8 only when no UTF-16 BOM is present.
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
         text = raw.decode("utf-16")
-    except UnicodeError:
+    else:
         text = raw.decode("utf-8-sig")
     return list(csv.DictReader(io.StringIO(text)))
