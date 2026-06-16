@@ -143,6 +143,34 @@ def _load_aso():
         return aso
 
 
+def _load_app_store_connect():
+    """Load App Store Connect CLI (downloads + product page views)."""
+    try:
+        from .app_store_connect.cli import app_store_connect
+        return app_store_connect
+    except ImportError as e:
+        @click.group(name="app-store-connect")
+        def app_store_connect():
+            """App Store Connect operations (not available - missing deps: PyJWT, requests)"""
+            click.echo(f"App Store Connect module not available: {e}", err=True)
+            raise SystemExit(1)
+        return app_store_connect
+
+
+def _load_play_store():
+    """Load Play Store CLI (installs + store-listing performance)."""
+    try:
+        from .play_store.cli import play_store
+        return play_store
+    except ImportError as e:
+        @click.group(name="play-store")
+        def play_store():
+            """Play Store operations (not available - missing deps: google-auth)"""
+            click.echo(f"Play Store module not available: {e}", err=True)
+            raise SystemExit(1)
+        return play_store
+
+
 def _load_appsflyer():
     """Load AppsFlyer CLI (Pull API V2 — aggregate + pulse)."""
     try:
@@ -168,6 +196,8 @@ main.add_command(_load_analytics())
 main.add_command(_load_seo())
 main.add_command(_load_aso())
 main.add_command(_load_appsflyer())
+main.add_command(_load_app_store_connect())
+main.add_command(_load_play_store())
 
 
 if __name__ == "__main__":
