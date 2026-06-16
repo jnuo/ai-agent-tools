@@ -142,11 +142,17 @@ def page_views_cmd(app_id, date_from, date_to, as_csv, as_json):
         click.echo(f"Not ready: {e}", err=True)
         raise SystemExit(2)
     result["app_id"] = app_id
-    click.echo(
-        "WARNING: page-views parsing is UNVERIFIED. The Engagement report's exact "
-        "metric/event columns haven't been confirmed against real data yet (App "
-        "Analytics is disabled while the app's analytics re-enable post-transfer), "
-        "so this sums all Counts and may overcount. Verify before trusting.",
-        err=True,
-    )
-    _emit_metric(result, as_json, as_csv, "Product page views")
+    if as_json or as_csv:
+        _emit_metric(result, as_json, as_csv, "Page views")
+        return
+    rng = result["range"]
+    click.echo(f"\nPage views — app {app_id} ({rng['from']} → {rng['to']})")
+    click.echo("(page views = Event 'Page view'; impressions/taps excluded)")
+    click.echo("─" * 60)
+    for d, n in result["daily"].items():
+        click.echo(f"  {d}: {n}")
+    click.echo("─" * 60)
+    click.echo(f"  total page views:  {result['total']}")
+    click.echo(f"  by page type:      {result['by_page_type']}")
+    click.echo(f"  by source:         {result['by_source']}")
+    click.echo(f"  (impressions:      {result['total_impressions']}; events: {result['by_event']})\n")

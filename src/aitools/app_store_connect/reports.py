@@ -27,6 +27,12 @@ _COUNT_COLS = ("Counts",)
 _DOWNLOAD_TYPES = {"First-time download", "Redownload"}
 _FIRST_TIME = "First-time download"
 
+# The Engagement report's "Event" column mixes Impression / Page view / Tap.
+# "Page view" events are store-listing page views (Page Type splits Product page
+# vs Store sheet). Verified against real data (2026-06).
+_PAGE_VIEW_EVENT = "Page view"
+_IMPRESSION_EVENT = "Impression"
+
 # An instance's processingDate runs ahead of the data dates it contains
 # (Apple's reporting lag). Pull instances a few days past the requested window
 # so late-arriving data for in-range dates is captured.
@@ -228,12 +234,26 @@ def downloads(app_id: str, date_from: str, date_to: str) -> dict:
 
 
 def page_views(app_id: str, date_from: str, date_to: str) -> dict:
+    """Store-listing page views per day.
+
+    The Engagement report's "Event" column mixes Impression / Page view / Tap;
+    page views = Event == "Page view" only (summing all Counts would conflate
+    impressions). Broken down by Page Type (Product page vs Store sheet). Total
+    impressions are reported alongside for context.
+    """
     rows = fetch_report_rows(app_id, ENGAGEMENT_REPORT, date_from, date_to)
+    pv_rows = [r for r in rows if r.get("Event") == _PAGE_VIEW_EVENT]
+    impression_rows = [r for r in rows if r.get("Event") == _IMPRESSION_EVENT]
+    daily = daily_totals(pv_rows)
     return {
         "report": ENGAGEMENT_REPORT,
         "range": {"from": date_from, "to": date_to},
-        "daily": daily_totals(rows),
-        "total": sum(daily_totals(rows).values()),
+        "daily": daily,
+        "total": sum(daily.values()),
+        "total_impressions": sum(daily_totals(impression_rows).values()),
+        "by_page_type": breakdown_by(pv_rows, "Page Type"),
+        "by_source": breakdown_by(pv_rows, "Source Type"),
+        "by_event": breakdown_by(rows, "Event"),
         "columns": list(rows[0].keys()) if rows else [],
         "rows": rows,
     }
