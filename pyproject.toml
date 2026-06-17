@@ -50,8 +50,16 @@ seo = [
 appsflyer = [
     "requests>=2.31.0",
 ]
+app_store_connect = [
+    "pyjwt[crypto]>=2.8.0",
+    "requests>=2.31.0",
+]
+play_store = [
+    "google-auth>=2.0.0",
+    "requests>=2.31.0",
+]
 all = [
-    "ai-agent-tools[google,notion,gemini,resend,analytics,seo,appsflyer]",
+    "ai-agent-tools[google,notion,gemini,resend,analytics,seo,appsflyer,app_store_connect,play_store]",
 ]
 dev = [
     "pytest>=8.0.0",

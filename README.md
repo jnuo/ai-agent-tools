@@ -228,6 +228,31 @@ echo 'DATAFORSEO_LOGIN=your-login' > credentials/seo/.env
 echo 'DATAFORSEO_PASSWORD=your-password' >> credentials/seo/.env
 ```
 
+### App Store Connect (downloads + page views)
+
+1. App Store Connect → Users and Access → Integrations → App Store Connect API → create a key (Admin/Finance/Sales role for analytics).
+2. Save the `.p8` at `~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8`.
+3. Set up:
+
+```bash
+mkdir -p credentials/app_store_connect
+echo 'ASC_KEY_ID=XXXXXXXXXX' > credentials/app_store_connect/.env
+echo 'ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' >> credentials/app_store_connect/.env
+# Optional: ASC_PRIVATE_KEY_PATH if the .p8 lives elsewhere.
+```
+
+### Play Store (installs + store-listing performance)
+
+1. Play Console → Download reports → Statistics → "Copy Cloud Storage URI" (`pubsite_prod_...`).
+2. A service account with read access to that bucket (Play auto-grants linked accounts; else grant Storage Object Viewer).
+3. Set up:
+
+```bash
+mkdir -p credentials/play_store
+cp /path/to/service-account.json credentials/play_store/service-account.json
+echo 'PLAY_REPORTS_BUCKET=pubsite_prod_XXXXXXXXXXXXXXXXXXX' > credentials/play_store/.env
+```
+
 ## CLI Reference
 
 ### Google Calendar
@@ -463,6 +488,37 @@ The database path defaults to `~/Documents/code/RoboPM/scripts/data/gsc.db` but 
 
 **Data flow:** Pull GSC data via the Google Search Console API or MCP tool → save as JSON → import into SQLite → query trends and search.
 
+### App Store Connect
+
+```bash
+# One-time: start the async analytics reports for an app (idempotent)
+aitools app-store-connect setup 6761076847
+
+# Check whether Apple has finished generating report instances
+aitools app-store-connect status 6761076847
+
+# Downloads + product page views per day
+aitools app-store-connect downloads  6761076847 --from 2026-06-01 --to 2026-06-14
+aitools app-store-connect page-views 6761076847 --from 2026-06-01 --to 2026-06-14 --json
+```
+
+App Store Connect generates these reports asynchronously; the first snapshot can take up to ~a day, and recent days lag ~1-2 days behind.
+
+### Play Store
+
+```bash
+# Daily installs (device + user)
+aitools play-store installs com.salta.dos --from 2026-06-01 --to 2026-06-14
+
+# Store-listing visitors (page views) + acquisitions
+aitools play-store store-performance com.salta.dos --from 2026-06-01 --to 2026-06-14 --json
+
+# List report objects in the bucket (discovery)
+aitools play-store ls --prefix stats/
+```
+
+Play exports monthly CSVs with a ~2-3 day lag.
+
 ## Using with Claude Code
 
 The best way to use this library is with Claude Code. Below are recommended permission settings and skill setup.
@@ -503,7 +559,12 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
       "Bash(*aitools resend inbox*)",
       "Bash(*aitools resend read*)",
       "Bash(*aitools analytics*)",
-      "Bash(*aitools seo*)"
+      "Bash(*aitools seo*)",
+      "Bash(*aitools appsflyer*)",
+      "Bash(*aitools app-store-connect status*)",
+      "Bash(*aitools app-store-connect downloads*)",
+      "Bash(*aitools app-store-connect page-views*)",
+      "Bash(*aitools play-store*)"
     ]
   }
 }
@@ -511,17 +572,20 @@ To avoid being prompted for every read operation, add these to your `~/.claude/s
 
 **What this allows (no prompts):**
 
-| Service   | Auto-allowed operations                                                                |
-| --------- | -------------------------------------------------------------------------------------- |
-| Gmail     | search, read, list, draft, labels, drafts, label create, modify, archive, batch-modify |
-| Calendar  | list, get, calendars                                                                   |
-| Notion    | tasks list/get/update, page get/blocks/append/update/search                            |
-| Granola   | all (read-only)                                                                        |
-| Gemini    | all (image generation)                                                                 |
-| Resend    | inbox, read                                                                            |
-| Analytics | all GA4 reports, all GitHub stats (read-only)                                          |
-| SEO       | all (lighthouse, pagespeed, autocomplete, serper, dataforseo volume — all read-only)   |
-| Help      | all --help commands                                                                    |
+| Service           | Auto-allowed operations                                                                |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| Gmail             | search, read, list, draft, labels, drafts, label create, modify, archive, batch-modify |
+| Calendar          | list, get, calendars                                                                   |
+| Notion            | tasks list/get/update, page get/blocks/append/update/search                            |
+| Granola           | all (read-only)                                                                        |
+| Gemini            | all (image generation)                                                                 |
+| Resend            | inbox, read                                                                            |
+| Analytics         | all GA4 reports, all GitHub stats (read-only)                                          |
+| SEO               | all (lighthouse, pagespeed, autocomplete, serper, dataforseo volume — all read-only)   |
+| AppsFlyer         | all (pulse, aggregate reports — read-only)                                             |
+| App Store Connect | status, downloads, page-views (read-only; `setup` requires approval)                   |
+| Play Store        | installs, store-performance, ls (read-only)                                            |
+| Help              | all --help commands                                                                    |
 
 **What still requires approval:**
 
