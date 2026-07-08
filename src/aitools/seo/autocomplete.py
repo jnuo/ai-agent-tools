@@ -1,5 +1,7 @@
 """Google Autocomplete suggestions."""
 
+import json as _json
+
 import httpx
 
 
@@ -27,6 +29,11 @@ def get_autocomplete(
         "q": query,
         "hl": lang,
         "gl": country,
+        # Force UTF-8 output. Without this, Google returns latin-5 (ISO-8859-9)
+        # bytes for Turkish (hl=tr), which breaks response.json() with a
+        # UnicodeDecodeError on byte 0xfd (ı/ş/ğ etc.).
+        "oe": "utf-8",
+        "ie": "utf-8",
     }
 
     response = httpx.get(url, params=params, timeout=10.0)
@@ -36,7 +43,10 @@ def get_autocomplete(
             f"Google Autocomplete error ({response.status_code}): {response.text}"
         )
 
-    data = response.json()
+    # Decode from raw bytes with UTF-8 (oe=utf-8 above), replacing any stray
+    # non-UTF-8 bytes rather than crashing. response.json() would re-detect the
+    # encoding and choke on legacy latin-5 responses.
+    data = _json.loads(response.content.decode("utf-8", "replace"))
 
     # Response format: ["query", ["suggestion1", "suggestion2", ...]]
     return data[1] if len(data) > 1 else []
