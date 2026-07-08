@@ -2,7 +2,7 @@
 
 ![AI Agent Tools Banner](banner.jpeg)
 
-A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, Gemini (image generation), Resend (email), Google Analytics 4, GitHub analytics, and SEO tools (Lighthouse, PageSpeed, Google Autocomplete, Serper SERP, DataForSEO keyword volume, GSC Intelligence). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
+A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, Gemini (image generation), Resend (email), Google Analytics 4, GitHub analytics, and SEO tools (Lighthouse, PageSpeed, Google Autocomplete, Serper SERP, DataForSEO keyword volume + Labs/Backlinks/AI-GEO/On-Page, GSC Intelligence). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
 
 ## Why This Exists
 
@@ -81,6 +81,24 @@ aitools seo serper "kan tahlili takip" --country tr --lang tr --json
 # SEO — DataForSEO Keyword Volume
 aitools seo volume "buy laptop" "cheap laptops" --json
 aitools seo volume "laptop kaufen" -c de -l de --json
+
+# SEO — DataForSEO Labs (competitor keywords, difficulty, ideas, intent)
+aitools seo ranked-keywords todoist.com -c us -l en          # keywords a domain ranks for
+aitools seo kd "daily planner" "todo list app" --json        # real keyword difficulty 0-100
+aitools seo keyword-ideas "daily planner" --limit 30         # broad ideas + volume
+aitools seo keyword-suggestions "daily planner" --json       # long-tails containing the seed
+aitools seo intent "daily planner" "buy planner app"         # info/nav/commercial/transactional
+
+# SEO — DataForSEO Backlinks (authority pillar; rank ≈ DR)
+aitools seo backlinks todoist.com                            # domain rank, backlinks, ref domains
+aitools seo referring-domains todoist.com --limit 20 --json
+
+# SEO — DataForSEO AI Optimization (GEO / AI-search visibility)
+aitools seo ai-answer "best daily planner app"               # does an LLM mention you?
+aitools seo ai-volume "daily planner" --json                 # how often a keyword is asked in AI chats
+
+# SEO — DataForSEO On-Page (instant single-page technical audit)
+aitools seo onpage https://getsalta.app --json
 
 # SEO — GSC Intelligence (store, trend, search Google Search Console data)
 aitools seo gsc add-site "sc-domain:example.com" "my-product"
@@ -457,6 +475,44 @@ aitools seo languages
 ```
 
 Output includes search volume, CPC, competition level, competition index, and monthly search trends.
+
+### SEO — DataForSEO (Labs, Backlinks, AI/GEO, On-Page)
+
+Deeper DataForSEO coverage for the content, authority, GEO, and technical pillars.
+All share the same credentials as `volume`. Add `--json` to any command for the
+full structured output. Labs/backlinks calls cost ~$0.012–0.024 each; `ai-answer`
+~$0.001; `onpage` ~$0.0002.
+
+```bash
+# Content pillar — Labs
+# Keywords a competitor domain already ranks for (position, volume, KD, URL)
+aitools seo ranked-keywords todoist.com -c us -l en --limit 50
+# Real keyword difficulty (0-100)
+aitools seo kd "daily planner" "todo list app" --json
+# Category-related keyword ideas with volume
+aitools seo keyword-ideas "daily planner" --limit 30
+# Long-tail suggestions containing the seed phrase
+aitools seo keyword-suggestions "daily planner" -c tr -l tr --json
+# Search intent classification (informational/navigational/commercial/transactional)
+aitools seo intent "daily planner" "buy planner app"
+
+# Authority pillar — Backlinks (rank 0-1000 ≈ Ahrefs DR / Moz DA proxy)
+aitools seo backlinks todoist.com
+aitools seo referring-domains todoist.com --limit 20 --json
+
+# GEO pillar — AI Optimization
+# What an LLM actually answers to a prompt (does it mention your brand?)
+aitools seo ai-answer "best daily planner app" --web-search
+# How often a keyword is searched inside AI assistants
+aitools seo ai-volume "daily planner" --json
+
+# Technical pillar — On-Page (instant single-page audit)
+aitools seo onpage https://getsalta.app --json
+```
+
+Labs endpoints require numeric location + language codes (handled by the same
+`-c`/`-l` country/language flags as `volume`; `aitools seo countries` /
+`languages` list what's supported).
 
 ### SEO — GSC Intelligence
 

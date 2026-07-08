@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from . import volume
+from . import ai_optim, backlinks, labs, onpage, volume
 from .gsc import DEFAULT_DB, GscDb
 
 
@@ -297,6 +297,364 @@ def search_volume(keywords: tuple, country: str, language: str, serp_info: bool,
     except Exception as e:
         click.echo(f"Failed: {e}", err=True)
         raise SystemExit(1)
+
+
+# =============================================================================
+# DataForSEO Labs — competitor keywords, difficulty, ideas, suggestions, intent
+# =============================================================================
+
+def _run(fn, as_json, pretty):
+    """Call an API fn, handle errors, and either emit JSON or run a pretty printer."""
+    try:
+        result = fn()
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise SystemExit(1)
+    except Exception as e:  # noqa: BLE001 - surface any unexpected failure to the CLI
+        click.echo(f"Failed: {e}", err=True)
+        raise SystemExit(1)
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+        return
+    pretty(result)
+
+
+@seo.command("ranked-keywords")
+@click.argument("domain")
+@click.option("--country", "-c", default="us", help="Country code (us, tr, de, ...)")
+@click.option("--language", "-l", default="en", help="Language code (en, tr, de, ...)")
+@click.option("--limit", default=50, help="Max keywords to return")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def ranked_keywords_cmd(domain: str, country: str, language: str, limit: int, as_json: bool):
+    """Keywords a domain/URL already ranks for (competitor keyword research).
+
+    Feed a competitor's domain to mine their winnable long-tails.
+
+    Examples:
+
+        aitools seo ranked-keywords todoist.com -c us -l en
+
+        aitools seo ranked-keywords notion.so --limit 100 --json
+    """
+    def pretty(r):
+        click.echo(f"\nRanked Keywords — {r['target']} ({country.upper()}, {language})")
+        click.echo(f"Total ranking keywords: {r.get('total_count'):,}  |  API Cost: ${r.get('cost', 0):.4f}")
+        click.echo("-" * 90)
+        click.echo(f"{'Keyword':<38} {'Pos':>4} {'Volume':>9} {'KD':>4} {'CPC':>7}")
+        click.echo("-" * 90)
+        for kw in r["keywords"]:
+            k = (kw["keyword"] or "")[:37]
+            pos = kw.get("rank_group") or 0
+            vol = kw.get("search_volume") or 0
+            kd = kw.get("keyword_difficulty")
+            kd_s = f"{kd}" if kd is not None else "-"
+            cpc = kw.get("cpc") or 0
+            click.echo(f"{k:<38} {pos:>4} {vol:>9,} {kd_s:>4} ${cpc:>6.2f}")
+
+    _run(lambda: labs.ranked_keywords(domain, country, language, limit), as_json, pretty)
+
+
+@seo.command("kd")
+@click.argument("keywords", nargs=-1, required=True)
+@click.option("--country", "-c", default="us", help="Country code (us, tr, de, ...)")
+@click.option("--language", "-l", default="en", help="Language code (en, tr, de, ...)")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def kd_cmd(keywords: tuple, country: str, language: str, as_json: bool):
+    """Real keyword difficulty (0-100) for one or more keywords.
+
+    Examples:
+
+        aitools seo kd "daily planner" "todo list app"
+
+        aitools seo kd "gunluk planlayici" -c tr -l tr --json
+    """
+    def pretty(r):
+        click.echo(f"\nKeyword Difficulty ({country.upper()}, {language})  |  Cost: ${r.get('cost', 0):.4f}")
+        click.echo("-" * 55)
+        click.echo(f"{'Keyword':<45} {'KD':>6}")
+        click.echo("-" * 55)
+        for kw in r["keywords"]:
+            k = (kw["keyword"] or "")[:44]
+            kd = kw.get("keyword_difficulty")
+            click.echo(f"{k:<45} {(kd if kd is not None else '-'):>6}")
+
+    _run(lambda: labs.keyword_difficulty(list(keywords), country, language), as_json, pretty)
+
+
+def _pretty_kw_volume_table(title):
+    def pretty(r):
+        click.echo(f"\n{title} — {r.get('country', '').upper()}/{r.get('language', '')}")
+        tc = r.get("total_count")
+        tc_s = f"  |  Total available: {tc:,}" if tc else ""
+        click.echo(f"API Cost: ${r.get('cost', 0):.4f}{tc_s}")
+        click.echo("-" * 70)
+        click.echo(f"{'Keyword':<42} {'Volume':>9} {'Comp':>8} {'CPC':>7}")
+        click.echo("-" * 70)
+        for kw in r["keywords"]:
+            k = (kw["keyword"] or "")[:41]
+            vol = kw.get("search_volume") or 0
+            comp = kw.get("competition_level") or "-"
+            cpc = kw.get("cpc") or 0
+            click.echo(f"{k:<42} {vol:>9,} {comp:>8} ${cpc:>6.2f}")
+    return pretty
+
+
+@seo.command("keyword-ideas")
+@click.argument("keywords", nargs=-1, required=True)
+@click.option("--country", "-c", default="us", help="Country code (us, tr, de, ...)")
+@click.option("--language", "-l", default="en", help="Language code (en, tr, de, ...)")
+@click.option("--limit", default=50, help="Max ideas to return")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def keyword_ideas_cmd(keywords: tuple, country: str, language: str, limit: int, as_json: bool):
+    """Broad, category-related keyword ideas with volume.
+
+    Examples:
+
+        aitools seo keyword-ideas "daily planner" --limit 30
+
+        aitools seo keyword-ideas "kan tahlili" -c tr -l tr --json
+    """
+    _run(
+        lambda: labs.keyword_ideas(list(keywords), country, language, limit),
+        as_json, _pretty_kw_volume_table("Keyword Ideas"),
+    )
+
+
+@seo.command("keyword-suggestions")
+@click.argument("seed")
+@click.option("--country", "-c", default="us", help="Country code (us, tr, de, ...)")
+@click.option("--language", "-l", default="en", help="Language code (en, tr, de, ...)")
+@click.option("--limit", default=50, help="Max suggestions to return")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def keyword_suggestions_cmd(seed: str, country: str, language: str, limit: int, as_json: bool):
+    """Long-tail suggestions containing the seed phrase, with volume.
+
+    Examples:
+
+        aitools seo keyword-suggestions "daily planner" --limit 30
+
+        aitools seo keyword-suggestions "gunluk plan" -c tr -l tr --json
+    """
+    _run(
+        lambda: labs.keyword_suggestions(seed, country, language, limit),
+        as_json, _pretty_kw_volume_table("Keyword Suggestions"),
+    )
+
+
+@seo.command("intent")
+@click.argument("keywords", nargs=-1, required=True)
+@click.option("--language", "-l", default="en", help="Language code (en, tr, de, ...)")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def intent_cmd(keywords: tuple, language: str, as_json: bool):
+    """Classify keywords by search intent (info/nav/commercial/transactional).
+
+    Examples:
+
+        aitools seo intent "daily planner" "buy planner app"
+
+        aitools seo intent "gunluk planlayici" -l tr --json
+    """
+    def pretty(r):
+        click.echo(f"\nSearch Intent ({language})  |  Cost: ${r.get('cost', 0):.4f}")
+        click.echo("-" * 70)
+        click.echo(f"{'Keyword':<40} {'Intent':<16} {'Prob':>6}")
+        click.echo("-" * 70)
+        for kw in r["keywords"]:
+            k = (kw["keyword"] or "")[:39]
+            intent = kw.get("intent") or "-"
+            prob = kw.get("probability") or 0
+            click.echo(f"{k:<40} {intent:<16} {prob:>6.2f}")
+
+    _run(lambda: labs.search_intent(list(keywords), language), as_json, pretty)
+
+
+# =============================================================================
+# DataForSEO Backlinks — authority pillar (domain rank ≈ DR)
+# =============================================================================
+
+@seo.command("backlinks")
+@click.argument("domain")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def backlinks_cmd(domain: str, as_json: bool):
+    """Backlink profile summary: domain rank, backlinks, referring domains.
+
+    'rank' (0-1000) is DataForSEO's domain-rank — the DR/DA proxy.
+
+    Examples:
+
+        aitools seo backlinks todoist.com
+
+        aitools seo backlinks getsalta.app --json
+    """
+    def pretty(r):
+        click.echo(f"\nBacklink Profile — {r['target']}  |  Cost: ${r.get('cost', 0):.4f}")
+        click.echo("-" * 55)
+        click.echo(f"  Domain rank (DR proxy):   {r.get('rank')}")
+        click.echo(f"  Total backlinks:          {(r.get('backlinks') or 0):,}")
+        click.echo(f"  Referring domains:        {(r.get('referring_domains') or 0):,}")
+        click.echo(f"  Referring main domains:   {(r.get('referring_main_domains') or 0):,}")
+        click.echo(f"  Referring pages:          {(r.get('referring_pages') or 0):,}")
+        click.echo(f"  Broken backlinks:         {(r.get('broken_backlinks') or 0):,}")
+        click.echo(f"  Spam score:               {r.get('backlinks_spam_score')}")
+        click.echo(f"  First seen:               {r.get('first_seen')}")
+
+    _run(lambda: backlinks.summary(domain), as_json, pretty)
+
+
+@seo.command("referring-domains")
+@click.argument("domain")
+@click.option("--limit", default=50, help="Max referring domains to return")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def referring_domains_cmd(domain: str, limit: int, as_json: bool):
+    """Top referring domains for a target, ranked by domain rank.
+
+    Examples:
+
+        aitools seo referring-domains todoist.com --limit 20
+
+        aitools seo referring-domains getsalta.app --json
+    """
+    def pretty(r):
+        click.echo(f"\nReferring Domains — {r['target']}")
+        click.echo(f"Total: {(r.get('total_count') or 0):,}  |  Cost: ${r.get('cost', 0):.4f}")
+        click.echo("-" * 70)
+        click.echo(f"{'Domain':<42} {'Rank':>5} {'Backlinks':>10} {'Spam':>5}")
+        click.echo("-" * 70)
+        for d in r["domains"]:
+            dom = (d["domain"] or "")[:41]
+            click.echo(f"{dom:<42} {(d.get('rank') or 0):>5} {(d.get('backlinks') or 0):>10,} {(d.get('spam_score') or 0):>5}")
+
+    _run(lambda: backlinks.referring_domains(domain, limit), as_json, pretty)
+
+
+# =============================================================================
+# DataForSEO AI Optimization — GEO / AI-search visibility
+# =============================================================================
+
+@seo.command("ai-answer")
+@click.argument("prompt")
+@click.option("--model", default="gpt-4o-mini", help="LLM model name")
+@click.option("--max-tokens", default=400, help="Max output tokens")
+@click.option("--web-search", is_flag=True, help="Let the model use web search")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def ai_answer_cmd(prompt: str, model: str, max_tokens: int, web_search: bool, as_json: bool):
+    """Get an LLM's actual answer to a prompt — the GEO 'does it mention us?' check.
+
+    Examples:
+
+        aitools seo ai-answer "best daily planner app"
+
+        aitools seo ai-answer "AI life planner apps" --web-search --json
+    """
+    def pretty(r):
+        click.echo(f"\nAI Answer ({r.get('model_name')})  |  Cost: ${r.get('cost', 0):.4f}"
+                   f"  |  tokens in/out: {r.get('input_tokens')}/{r.get('output_tokens')}")
+        click.echo("-" * 70)
+        click.echo(r.get("answer") or "(no answer returned)")
+
+    _run(
+        lambda: ai_optim.ai_answer(prompt, model, max_tokens, web_search),
+        as_json, pretty,
+    )
+
+
+@seo.command("ai-volume")
+@click.argument("keywords", nargs=-1, required=True)
+@click.option("--country", "-c", default="us", help="Country code (us, tr, de, ...)")
+@click.option("--language", "-l", default="en", help="Language code (en, tr, de, ...)")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def ai_volume_cmd(keywords: tuple, country: str, language: str, as_json: bool):
+    """AI-assistant search volume — how often a keyword is asked inside AI chats.
+
+    Examples:
+
+        aitools seo ai-volume "daily planner" "todo app"
+
+        aitools seo ai-volume "gunluk planlayici" -c tr -l tr --json
+    """
+    def pretty(r):
+        click.echo(f"\nAI Search Volume ({country.upper()}, {language})  |  Cost: ${r.get('cost', 0):.4f}")
+        click.echo("-" * 55)
+        click.echo(f"{'Keyword':<42} {'AI Volume':>10}")
+        click.echo("-" * 55)
+        for kw in r["keywords"]:
+            k = (kw["keyword"] or "")[:41]
+            click.echo(f"{k:<42} {(kw.get('ai_search_volume') or 0):>10,}")
+
+    _run(lambda: ai_optim.ai_search_volume(list(keywords), country, language), as_json, pretty)
+
+
+# =============================================================================
+# DataForSEO On-Page — technical pillar (instant single-page audit)
+# =============================================================================
+
+# On-page 'checks' keys where a True value reliably signals an SEO problem.
+_ONPAGE_PROBLEM_CHECKS = (
+    "no_title",
+    "no_description",
+    "no_h1_tag",
+    "no_favicon",
+    "no_image_alt",
+    "no_doctype",
+    "no_encoding_meta_tag",
+    "title_too_long",
+    "title_too_short",
+    "duplicate_title_tag",
+    "duplicate_meta_tags",
+    "deprecated_html_tags",
+    "is_broken",
+    "is_4xx_code",
+    "is_5xx_code",
+    "is_redirect",
+    "is_www",
+    "high_loading_time",
+    "has_render_blocking_resources",
+    "low_content_rate",
+    "small_page_size",
+    "canonical_to_broken",
+    "recursive_canonical",
+    "has_meta_refresh_redirect",
+    "https_to_http_links",
+)
+
+@seo.command("onpage")
+@click.argument("url")
+@click.option("--js", "enable_js", is_flag=True, help="Render JavaScript before auditing")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def onpage_cmd(url: str, enable_js: bool, as_json: bool):
+    """Instant single-page technical SEO audit (title, meta, htags, checks).
+
+    Examples:
+
+        aitools seo onpage https://getsalta.app
+
+        aitools seo onpage https://todoist.com --js --json
+    """
+    def pretty(r):
+        if not r.get("success"):
+            click.echo(f"\n{url}: {r.get('error')}")
+            return
+        click.echo(f"\nOn-Page Audit — {r['url']}  |  Cost: ${r.get('cost', 0):.4f}")
+        click.echo("-" * 70)
+        click.echo(f"  HTTP status:      {r.get('status_code')}")
+        click.echo(f"  On-page score:    {r.get('onpage_score')}")
+        click.echo(f"  Title:            {r.get('title')}")
+        click.echo(f"  Description:      {(r.get('description') or '')[:100]}")
+        click.echo(f"  Canonical:        {r.get('canonical')}")
+        h1 = r.get("h1") or []
+        click.echo(f"  H1:               {h1[0][:80] if h1 else '(none)'}")
+        click.echo(f"  Internal links:   {r.get('internal_links_count')}")
+        click.echo(f"  External links:   {r.get('external_links_count')}")
+        click.echo(f"  Images:           {r.get('images_count')}")
+        # Surface only checks whose True value is unambiguously a problem
+        # (DataForSEO 'checks' semantics vary per key, so use a curated set
+        # rather than guessing from the name). Full checks are in --json.
+        checks = r.get("checks") or {}
+        problems = [k for k in _ONPAGE_PROBLEM_CHECKS if checks.get(k) is True]
+        if problems:
+            click.echo(f"  Issues:           {', '.join(problems)}")
+
+    _run(lambda: onpage.instant_page(url, enable_js), as_json, pretty)
 
 
 @seo.command("countries")
