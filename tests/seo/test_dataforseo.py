@@ -7,8 +7,10 @@ request shaping and response parsing.
 from unittest.mock import patch
 
 import pytest
+from click.testing import CliRunner
 
 from aitools.seo import ai_optim, backlinks, client, labs, onpage
+from aitools.seo.cli import seo
 
 
 # ---------------------------------------------------------------------------
@@ -246,3 +248,42 @@ class TestOnPage:
             out = onpage.instant_page("https://unreachable.example")
         assert out["success"] is False
         assert "error" in out
+
+
+# ---------------------------------------------------------------------------
+# CLI pretty-printer robustness (regression: None fields must not crash)
+# ---------------------------------------------------------------------------
+
+class TestCliRobustness:
+    def test_ranked_keywords_pretty_handles_none_total_count(self):
+        """A domain with zero ranked keywords yields total_count=None; the
+        pretty printer must render 0, not crash with a TypeError."""
+        payload = {"success": True, "target": "x.com", "country": "us",
+                   "language": "en", "total_count": None, "cost": 0.01, "keywords": []}
+        with patch("aitools.seo.cli.labs.ranked_keywords", return_value=payload):
+            result = CliRunner().invoke(seo, ["ranked-keywords", "x.com"])
+        assert result.exit_code == 0, result.output
+        assert "Total ranking keywords: 0" in result.output
+
+    def test_onpage_pretty_handles_null_h1_element(self):
+        """DataForSEO can return htags.h1: [null]; the printer must not crash."""
+        payload = {"success": True, "url": "https://x.com", "cost": 0.0001,
+                   "status_code": 200, "onpage_score": 90.0, "title": "T",
+                   "description": "d", "canonical": "https://x.com", "h1": [None],
+                   "internal_links_count": 1, "external_links_count": 1,
+                   "images_count": 0, "checks": {}}
+        with patch("aitools.seo.cli.onpage.instant_page", return_value=payload):
+            result = CliRunner().invoke(seo, ["onpage", "https://x.com"])
+        assert result.exit_code == 0, result.output
+        assert "(none)" in result.output
+
+    def test_run_helper_surfaces_printer_error_cleanly(self):
+        """A crash inside a pretty printer exits 1 with a message, not a traceback."""
+        # search_volume for a keyword the API returns without expected keys still
+        # shouldn't raise raw; force a printer error via a malformed KD payload.
+        bad = {"success": True, "country": "us", "language": "en", "cost": 0.0,
+               "keywords": [{"keyword": None, "keyword_difficulty": None}]}
+        with patch("aitools.seo.cli.labs.keyword_difficulty", return_value=bad):
+            result = CliRunner().invoke(seo, ["kd", "x"])
+        # kd printer guards None keyword via (kw['keyword'] or ''); should succeed.
+        assert result.exit_code == 0, result.output

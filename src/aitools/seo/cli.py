@@ -304,19 +304,26 @@ def search_volume(keywords: tuple, country: str, language: str, serp_info: bool,
 # =============================================================================
 
 def _run(fn, as_json, pretty):
-    """Call an API fn, handle errors, and either emit JSON or run a pretty printer."""
+    """Call an API fn, handle errors, and either emit JSON or run a pretty printer.
+
+    The pretty printer runs inside the same guard as the API call so a formatting
+    slip (e.g. a numeric format spec applied to an unexpected None) surfaces as a
+    clean CLI error instead of a raw traceback.
+    """
     try:
         result = fn()
+        if as_json:
+            click.echo(json.dumps(result, indent=2))
+            return
+        pretty(result)
     except ValueError as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
+    except SystemExit:
+        raise
     except Exception as e:  # noqa: BLE001 - surface any unexpected failure to the CLI
         click.echo(f"Failed: {e}", err=True)
         raise SystemExit(1)
-    if as_json:
-        click.echo(json.dumps(result, indent=2))
-        return
-    pretty(result)
 
 
 @seo.command("ranked-keywords")
@@ -338,7 +345,7 @@ def ranked_keywords_cmd(domain: str, country: str, language: str, limit: int, as
     """
     def pretty(r):
         click.echo(f"\nRanked Keywords — {r['target']} ({country.upper()}, {language})")
-        click.echo(f"Total ranking keywords: {r.get('total_count'):,}  |  API Cost: ${r.get('cost', 0):.4f}")
+        click.echo(f"Total ranking keywords: {(r.get('total_count') or 0):,}  |  API Cost: ${r.get('cost', 0):.4f}")
         click.echo("-" * 90)
         click.echo(f"{'Keyword':<38} {'Pos':>4} {'Volume':>9} {'KD':>4} {'CPC':>7}")
         click.echo("-" * 90)
@@ -642,7 +649,8 @@ def onpage_cmd(url: str, enable_js: bool, as_json: bool):
         click.echo(f"  Description:      {(r.get('description') or '')[:100]}")
         click.echo(f"  Canonical:        {r.get('canonical')}")
         h1 = r.get("h1") or []
-        click.echo(f"  H1:               {h1[0][:80] if h1 else '(none)'}")
+        first_h1 = str(h1[0])[:80] if h1 and h1[0] else "(none)"
+        click.echo(f"  H1:               {first_h1}")
         click.echo(f"  Internal links:   {r.get('internal_links_count')}")
         click.echo(f"  External links:   {r.get('external_links_count')}")
         click.echo(f"  Images:           {r.get('images_count')}")
