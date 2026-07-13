@@ -2,20 +2,23 @@
 
 import json
 from datetime import datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import click
 from dateutil import parser as dateparser
+from googleapiclient.errors import HttpError
 
 from . import calendar as gcal
 from . import gmail
+from . import youtube as yt
 from .auth import clear_credentials
 from ..config import get_timezone
 
 
 @click.group()
 def google():
-    """Google Workspace operations (Calendar, Gmail)."""
+    """Google Workspace operations (Calendar, Gmail, YouTube)."""
     pass
 
 
@@ -385,12 +388,282 @@ def _print_email(email: dict):
 
 
 # =============================================================================
+# YOUTUBE COMMANDS
+# =============================================================================
+
+
+@google.group()
+def youtube():
+    """YouTube operations (channel comments, video upload).
+
+    Uses its own OAuth token (token_youtube.json), because the YouTube channel
+    is typically owned by a different Google account than Calendar/Gmail. The
+    first command opens a browser once — sign in as the CHANNEL OWNER.
+
+    All commands act on the channel the cached token owns. To work with a second
+    channel (e.g. a different product or a work account), pass --account NAME —
+    each name gets its own token file and its own consent.
+    """
+    pass
+
+
+def _fail(message: str):
+    """Print an actionable error and exit non-zero (no traceback)."""
+    raise click.ClickException(message)
+
+
+def _run_youtube(fn):
+    """Run a YouTube call, turning the known API failures into readable errors."""
+    try:
+        return fn()
+    except yt.ScopeError as err:
+        _fail(str(err))
+    except (FileNotFoundError, ValueError) as err:
+        _fail(str(err))
+    except LookupError as err:
+        _fail(str(err))
+    except ConnectionError as err:
+        _fail(
+            f"Upload interrupted: {err}\n"
+            "The transfer is resumable — just re-run the same command."
+        )
+    except HttpError as err:
+        status = err.resp.status
+        reason = str(err)
+
+        if status == 403 and "has not been used in project" in reason:
+            project = reason.split("project ")[1].split(" ")[0].rstrip(".")
+            _fail(
+                "YouTube Data API v3 is not enabled for this Google Cloud project.\n"
+                "Enable it here, wait a minute, then retry:\n"
+                f"  https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project={project}"
+            )
+        if status == 403 and (
+            "quota" in reason.lower() or "uploadLimitExceeded" in reason
+        ):
+            _fail(
+                "YouTube API quota exhausted for today.\n"
+                "videos.insert has its own daily bucket (100 uploads/day by default). "
+                "Retry tomorrow, or request more quota in the Google Cloud Console."
+            )
+        if status == 400 and "invalidCategoryId" in reason:
+            _fail(
+                "Invalid --category-id for this region.\n"
+                "Valid ids: https://developers.google.com/youtube/v3/docs/videoCategories/list"
+            )
+        if status in (401, 403):
+            _fail(
+                "Not authorized for this channel.\n"
+                "The cached token must belong to the CHANNEL OWNER. Re-authenticate with:\n"
+                "  aitools google logout --youtube\n"
+                f"Raw: {err}"
+            )
+        _fail(f"YouTube API error (HTTP {status}): {err}")
+
+
+account_option = click.option(
+    "--account",
+    default=None,
+    help="Named OAuth profile, to use a channel owned by another Google account",
+)
+
+
+@youtube.command("comments")
+@click.option("--handle", "-h", required=True, help="Channel handle (e.g. salta_app)")
+@click.option("--days", "-d", default=7, help="Only comments from the last N days")
+@click.option("--max-videos", "-n", default=25, help="How many recent videos to scan")
+@click.option("--unanswered", is_flag=True, help="Only show comments we haven't replied to")
+@account_option
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def youtube_comments(
+    handle: str,
+    days: int,
+    max_videos: int,
+    unanswered: bool,
+    account: str,
+    as_json: bool,
+):
+    """List recent comments across a channel's videos."""
+    result = _run_youtube(
+        lambda: yt.list_comments(
+            handle=handle, days=days, max_videos=max_videos, account=account
+        )
+    )
+
+    comments = result["comments"]
+    if unanswered:
+        comments = [c for c in comments if not c["has_response"]]
+        result = {**result, "comments": comments, "total": len(comments)}
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2, ensure_ascii=False))
+        return
+
+    click.echo(
+        f"@{result['handle']} — {result['total']} comment(s) in the last {days}d "
+        f"across {result['videos_scanned']} video(s), "
+        f"{result['unanswered']} unanswered"
+    )
+    click.echo()
+
+    for comment in comments:
+        mark = " " if comment["has_response"] else "*"
+        click.echo(f"{mark} {comment['author']}: {comment['body']}")
+        click.echo(f"    On: {comment['video_title']} ({comment['video_url']})")
+        click.echo(f"    Date: {comment['date']}  Likes: {comment['likes']}")
+        if comment["has_response"]:
+            click.echo(f"    Replied: {comment['response']}")
+        click.echo(f"    ID: {comment['id']}")
+        click.echo()
+
+    if result.get("videos_with_comments_disabled"):
+        disabled = result["videos_with_comments_disabled"]
+        click.echo(f"Note: comments disabled on {len(disabled)} video(s).")
+
+
+@youtube.command("reply")
+@click.argument("comment_id")
+@click.argument("text")
+@account_option
+def youtube_reply(comment_id: str, text: str, account: str):
+    """Reply to a comment AS THE CHANNEL. Posts immediately."""
+    result = _run_youtube(
+        lambda: yt.reply_to_comment(comment_id, text, account=account)
+    )
+    click.echo(f"Replied to {result['parent_comment_id']} (reply {result['reply_id']})")
+
+
+@youtube.command("upload")
+@click.argument("video_path", type=click.Path())
+@click.option("--title", "-t", required=True, help="Video title")
+@click.option("--description", "-d", default="", help="Video description")
+@click.option(
+    "--description-file",
+    type=click.Path(),
+    help="Read the description from a file (for long, multiline text)",
+)
+@click.option("--tags", default="", help="Comma-separated keyword tags")
+@click.option(
+    "--privacy",
+    type=click.Choice(yt.PRIVACY_STATUSES),
+    default="public",
+    show_default=True,
+    help="public = live for everyone; unlisted = only people with the link "
+    "(internal shares); private = only you",
+)
+@click.option(
+    "--category-id",
+    default="28",
+    show_default=True,
+    help="YouTube category id (28 = Science & Technology). See videoCategories.list",
+)
+@click.option(
+    "--made-for-kids/--not-made-for-kids",
+    default=False,
+    show_default=True,
+    help="Self-declared 'made for kids' status",
+)
+@click.option("--playlist", default=None, help="Add the video to this playlist (name or id)")
+@account_option
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def youtube_upload(
+    video_path: str,
+    title: str,
+    description: str,
+    description_file: str,
+    tags: str,
+    privacy: str,
+    category_id: str,
+    made_for_kids: bool,
+    playlist: str,
+    account: str,
+    as_json: bool,
+):
+    """Upload a video to the YouTube channel this token owns.
+
+    PUBLISHES IMMEDIATELY at --privacy (default: public). Use --privacy unlisted
+    for link-only internal shares, or --privacy private to keep it to yourself.
+
+    The upload is resumable and chunked, so an interrupted transfer can be
+    resumed by re-running the same command.
+
+    Quota: videos.insert has had its own daily quota bucket since June 2026 —
+    100 uploads/day by default, separate from the 10,000-unit pool the read
+    endpoints share. (It used to cost 1600 units of that pool, i.e. ~6/day;
+    Google cut that in December 2025.)
+
+    A 9:16 video of 3 minutes or less is classified as a Short by YouTube
+    automatically — there is no API flag for it.
+
+    \b
+    Examples:
+      # Public release video
+      aitools google youtube upload out.mp4 --title "v1.27" \\
+          --description-file notes.md --tags "release,ai"
+    \b
+      # Unlisted video, shared by link with colleagues
+      aitools google youtube upload demo.mp4 --title "Internal demo" \\
+          --privacy unlisted
+    """
+    if description_file:
+        path = Path(description_file).expanduser()
+        if not path.exists():
+            raise click.ClickException(f"Description file not found: {path}")
+        description = path.read_text(encoding="utf-8")
+
+    tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
+
+    if not as_json:
+        click.echo(f"Uploading {video_path} ...")
+
+    def _progress(percent: int):
+        if not as_json:
+            click.echo(f"  {percent}%", nl=False)
+            click.echo("\r", nl=False)
+
+    result = _run_youtube(
+        lambda: yt.upload_video(
+            video_path=video_path,
+            title=title,
+            description=description,
+            tags=tag_list,
+            privacy=privacy,
+            category_id=category_id,
+            made_for_kids=made_for_kids,
+            playlist=playlist,
+            account=account,
+            on_progress=_progress,
+        )
+    )
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2, ensure_ascii=False))
+        return
+
+    click.echo()
+    click.echo(f"Uploaded: {result['title']}")
+    click.echo(f"  Video ID: {result['video_id']}")
+    click.echo(f"  URL:      {result['url']}")
+    click.echo(f"  Privacy:  {result['privacy']}")
+
+    if result.get("playlist_id"):
+        click.echo(f"  Playlist: {result['playlist_id']}")
+    if result.get("playlist_error"):
+        click.echo(f"  Warning:  {result['playlist_error']}")
+
+
+# =============================================================================
 # AUTH COMMANDS
 # =============================================================================
 
 
 @google.command("logout")
-def logout():
+@click.option("--youtube", "youtube_token", is_flag=True, help="Clear the YouTube token instead")
+@click.option("--account", default=None, help="Named YouTube OAuth profile to clear")
+def logout(youtube_token: bool, account: str):
     """Clear stored credentials (re-authenticate on next use)."""
-    clear_credentials()
+    if account and not youtube_token:
+        raise click.ClickException("--account only applies with --youtube.")
+
+    clear_credentials(youtube=youtube_token, account=account)
     click.echo("Logged out. Next command will require re-authentication.")

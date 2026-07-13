@@ -2,7 +2,7 @@
 
 ![AI Agent Tools Banner](banner.jpeg)
 
-A Python CLI library for AI agents to interact with Gmail, Google Calendar, Notion, Granola, Gemini (image generation), Resend (email), Google Analytics 4, GitHub analytics, and SEO tools (Lighthouse, PageSpeed, Google Autocomplete, Serper SERP, DataForSEO keyword volume + Labs/Backlinks/AI-GEO/On-Page, GSC Intelligence). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
+A Python CLI library for AI agents to interact with Gmail, Google Calendar, YouTube (channel comments + video upload), Notion, Granola, Gemini (image generation), Resend (email), Google Analytics 4, GitHub analytics, and SEO tools (Lighthouse, PageSpeed, Google Autocomplete, Serper SERP, DataForSEO keyword volume + Labs/Backlinks/AI-GEO/On-Page, GSC Intelligence). Designed to be used with Claude Code, Cursor, and other AI coding assistants.
 
 ## Why This Exists
 
@@ -40,6 +40,12 @@ aitools google calendar list --days 7 --json
 
 # Gmail
 aitools google mail list --max 10 --json
+
+# YouTube channel comments (reply as the channel)
+aitools google youtube comments --handle salta_app --days 7 --unanswered --json
+
+# YouTube upload (public by default; --privacy unlisted for internal link-only shares)
+aitools google youtube upload out.mp4 --title "Release v1.27" --description-file notes.md --json
 
 # Notion Tasks
 aitools notion tasks list DATABASE_ID --status "Todo" --json
@@ -119,6 +125,30 @@ aitools seo gsc stats
 5. Download JSON and save as `credentials/google/client_secret.json`
 
 First run will open browser for OAuth login. Token is cached in `credentials/google/token.json`.
+
+### YouTube
+
+Reuses the same `client_secret.json`, but authenticates **separately** — the YouTube
+channel is usually owned by a different Google account than Calendar/Gmail.
+
+1. Enable **YouTube Data API v3** in the same Google Cloud project
+2. Run any `aitools google youtube ...` command
+3. A browser opens **once** — sign in as the **channel owner**, not your personal account
+
+Token is cached in `credentials/google/token_youtube.json`. Scope is
+`youtube.force-ssl`, which covers read, reply, **and upload** — one consent, no
+re-auth needed to start uploading. Re-authenticate with `aitools google logout --youtube`.
+
+**Multiple channels.** Every command takes `--account NAME` to select a channel owned
+by a different Google account (e.g. one per product, or a work channel):
+
+```bash
+aitools google youtube upload demo.mp4 --title "Demo" --account work   # token_youtube_work.json
+aitools google logout --youtube --account work                         # re-auth just that one
+```
+
+Each name gets its own token file and its own browser consent. Without `--account`,
+the default `token_youtube.json` is used.
 
 ### Google Analytics 4
 
@@ -298,6 +328,92 @@ aitools google mail archive MESSAGE_ID [MESSAGE_ID...]
 aitools google mail trash MESSAGE_ID
 aitools google mail batch-modify --ids "id1,id2,id3" [--add-label ID] [--remove-label ID] [--json]
 ```
+
+### YouTube (channel comments + video upload)
+
+```bash
+aitools google youtube comments --handle salta_app [--days 7] [--max-videos 25] [--unanswered] [--json]
+aitools google youtube reply COMMENT_ID "Reply text"     # posts immediately, as the channel
+aitools google youtube upload VIDEO_PATH --title "..."   # see below
+aitools google logout --youtube                          # re-authenticate the YouTube account only
+```
+
+Comments are marked answered when a reply on the thread is authored by the channel
+itself. `reply` posts publicly and immediately — there is no draft step.
+
+Uses a **separate OAuth token** (`credentials/google/token_youtube.json`) because the
+YouTube channel is usually owned by a different Google account than Calendar/Gmail.
+Add `--account NAME` to any command to use a second channel.
+
+#### Upload a video
+
+Uploads to whichever channel the cached token owns. Nothing about the video is
+hardcoded — title, description, tags, category, and privacy all come from flags.
+
+```bash
+aitools google youtube upload VIDEO_PATH \
+  --title "..." \
+  [--description "..." | --description-file NOTES.md] \
+  [--tags "a,b,c"] \
+  [--privacy public|private|unlisted] \
+  [--category-id 28] \
+  [--made-for-kids | --not-made-for-kids] \
+  [--playlist "Releases"] \
+  [--account NAME] \
+  [--json]
+```
+
+| Flag                 | Default                     | Notes                                                                                                        |
+| -------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `--privacy`          | `public`                    | `unlisted` = link-only, for internal shares. `private` = only you.                                           |
+| `--category-id`      | `28` (Science & Technology) | Any id from [`videoCategories.list`](https://developers.google.com/youtube/v3/docs/videoCategories/list).    |
+| `--made-for-kids`    | `--not-made-for-kids`       | Self-declared COPPA status.                                                                                  |
+| `--description-file` | —                           | For long, multiline descriptions. Overrides `--description`.                                                 |
+| `--playlist`         | —                           | Playlist **name or id**. A playlist miss never fails the upload — the URL is still returned, with a warning. |
+
+**The upload publishes immediately** at the chosen privacy. It is resumable and
+chunked (5 MB), so a dropped connection retries the current chunk rather than
+restarting a 60 MB transfer; progress is printed as it goes.
+
+```bash
+# Public release video, description from a file
+aitools google youtube upload out.mp4 \
+  --title "Salta v1.27 — what's new" \
+  --description-file release-notes.md \
+  --tags "productivity,ai" --json
+
+# Unlisted internal video — share the link with colleagues
+aitools google youtube upload demo.mp4 \
+  --title "Q3 demo (internal)" \
+  --privacy unlisted --account work
+```
+
+On success it prints the **video id and URL** (structured under `--json`):
+
+```json
+{
+  "status": "ok",
+  "video_id": "abc123",
+  "url": "https://youtube.com/watch?v=abc123",
+  "privacy": "public"
+}
+```
+
+**Quota.** Since June 2026 `videos.insert` has its **own daily quota bucket** —
+**100 uploads/day** by default, separate from the 10,000-unit pool the read endpoints
+share. (Before December 2025 an upload cost 1600 units of that shared pool, i.e. only
+~6/day. That is no longer the case.)
+
+**Scopes.** Upload needs one of `youtube.upload`, `youtube.force-ssl`, `youtube`, or
+`youtubepartner`. The cached token is checked **before** any bytes are sent, so an
+under-scoped token fails in a second with re-auth instructions instead of a 403
+partway through the transfer.
+
+**Shorts.** There is no "this is a Short" API flag. YouTube classifies a video as a
+Short automatically from the file itself — **vertical (9:16) aspect ratio and a
+duration of 3 minutes or less**. Upload a vertical clip with this same command and it
+becomes a Short. (`#Shorts` in the title/description is not required for
+classification; it historically only helped discovery.)
 
 ### Notion Tasks
 
@@ -837,6 +953,7 @@ ai-agent-tools/
 │   │   ├── auth.py         # OAuth handling
 │   │   ├── calendar.py     # Calendar API
 │   │   ├── gmail.py        # Gmail API
+│   │   ├── youtube.py      # YouTube Data API (channel comments + video upload)
 │   │   └── cli.py          # Google CLI commands
 │   ├── notion/
 │   │   ├── auth.py         # API key handling
