@@ -135,3 +135,52 @@ class TestClearCredentials:
 
         captured = capsys.readouterr()
         assert "No stored credentials" in captured.out
+
+
+class TestYouTubeTokenFilename:
+    """Each YouTube account profile gets its own token file."""
+
+    def test_default_profile_keeps_the_historical_name(self):
+        from aitools.google.auth import youtube_token_filename
+
+        assert youtube_token_filename() is not None
+        assert youtube_token_filename() == "token_youtube.json"
+        assert youtube_token_filename(None) == "token_youtube.json"
+
+    def test_named_profile_gets_its_own_file(self):
+        from aitools.google.auth import youtube_token_filename
+
+        assert youtube_token_filename("cosmo") == "token_youtube_cosmo.json"
+
+    def test_name_is_normalized(self):
+        from aitools.google.auth import youtube_token_filename
+
+        assert youtube_token_filename(" Cosmo Work ") == "token_youtube_cosmo-work.json"
+
+    def test_rejects_a_name_that_normalizes_to_nothing(self):
+        import pytest
+
+        from aitools.google.auth import youtube_token_filename
+
+        with pytest.raises(ValueError, match="Invalid account name"):
+            youtube_token_filename("///")
+
+    def test_clear_credentials_removes_the_named_youtube_token(self, tmp_path, capsys):
+        from aitools.google.auth import clear_credentials
+
+        token_file = tmp_path / "token_youtube_cosmo.json"
+        token_file.write_text('{"token": "test"}')
+
+        clear_credentials(tmp_path, youtube=True, account="cosmo")
+
+        assert not token_file.exists()
+        assert "Removed" in capsys.readouterr().out
+
+
+class TestYouTubeUploadScopes:
+    """force-ssl must cover videos.insert, or every upload 403s."""
+
+    def test_default_youtube_scope_authorizes_upload(self):
+        from aitools.google.auth import YOUTUBE_SCOPES, YOUTUBE_UPLOAD_SCOPES
+
+        assert set(YOUTUBE_SCOPES) & YOUTUBE_UPLOAD_SCOPES
